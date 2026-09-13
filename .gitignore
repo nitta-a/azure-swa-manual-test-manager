@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+dist/
+.env
+.env.*
+!.env.example
+.azure/
+.swa/
+coverage/
+
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md

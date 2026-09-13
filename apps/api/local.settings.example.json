@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AZURE_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+    "ADO_ORGANIZATION_URL": "https://dev.azure.com/your-org",
+    "ADO_PROJECT": "your-project",
+    "ADO_REPOSITORY_ID": "your-repository-id",
+    "ADO_PAT": "set-locally-only",
+    "MANIFEST_PATH": ".manual-test-manifest.yml"
+  }
+}

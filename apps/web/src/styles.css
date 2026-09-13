@@ -1,0 +1,119 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #17202a;
+  background: #f6f8fb;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 920px;
+  margin: auto;
+  padding: 0 24px 48px;
+}
+nav {
+  padding: 20px 0;
+}
+nav a {
+  color: #175cd3;
+  text-decoration: none;
+  font-weight: 700;
+}
+header {
+  margin: 28px 0;
+}
+h1 {
+  font-size: 2rem;
+}
+h2 {
+  margin-top: 0;
+}
+.cards,
+.items {
+  padding: 0;
+  list-style: none;
+}
+.cards li,
+.items li,
+fieldset,
+.history {
+  background: white;
+  border: 1px solid #dce3ec;
+  border-radius: 10px;
+  margin: 12px 0;
+  padding: 16px;
+}
+.cards a {
+  display: grid;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+.cards span,
+small {
+  color: #687386;
+  display: block;
+}
+fieldset {
+  display: grid;
+  gap: 14px;
+}
+legend {
+  font-weight: 700;
+}
+.check {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 8px;
+}
+.check small {
+  grid-column: 2;
+}
+button {
+  border: 0;
+  border-radius: 7px;
+  background: #175cd3;
+  color: white;
+  padding: 9px 14px;
+  cursor: pointer;
+  margin: 3px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button.quiet {
+  background: #e9eef6;
+  color: #26364d;
+}
+.items li > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+.items .actions {
+  margin-top: 10px;
+}
+.status {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+.status.passed {
+  color: #087443;
+}
+.status.failed {
+  color: #b42318;
+}
+.status.blocked {
+  color: #b54708;
+}
+.error {
+  color: #b42318;
+  background: #fff0ef;
+  padding: 12px;
+  border-radius: 7px;
+}
+code {
+  background: #edf1f7;
+  padding: 2px 5px;
+  border-radius: 4px;
+}

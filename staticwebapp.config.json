@@ -1,0 +1,7 @@
+{
+  "routes": [{ "route": "/*", "allowedRoles": ["authenticated"] }],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/*.{css,js,json,ico,png,svg}"]
+  }
+}
