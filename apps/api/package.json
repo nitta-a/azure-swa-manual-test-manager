@@ -9,7 +9,7 @@
     "test": "node --test dist/*.test.js"
   },
   "dependencies": {
-    "@azure/functions": "^4.7.2",
+    "@azure/functions": "^4.16.2",
     "@manual-test-manager/azure-devops": "workspace:*",
     "@manual-test-manager/domain": "workspace:*",
     "@manual-test-manager/manifest": "workspace:*",
