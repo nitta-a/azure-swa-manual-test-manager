@@ -58,14 +58,9 @@ export interface Execution {
 
 export const api = {
   projectId,
-  listPullRequests: () =>
-    request<PullRequest[]>(
-      `/projects/${encodeURIComponent(projectId)}/pull-requests`,
-    ),
+  listPullRequests: () => request<PullRequest[]>(`/projects/${encodeURIComponent(projectId)}/pull-requests`),
   getDefinition: (pullRequestId: string) =>
-    request<Definition>(
-      `/projects/${encodeURIComponent(projectId)}/pull-requests/${pullRequestId}/test-definition`,
-    ),
+    request<Definition>(`/projects/${encodeURIComponent(projectId)}/pull-requests/${pullRequestId}/test-definition`),
   startRun: (pullRequestId: number, suiteIds: string[]) =>
     request<{ value: { id: string } }>("/test-runs", {
       method: "POST",
@@ -78,8 +73,6 @@ export const api = {
       headers: { "if-match": etag },
       body: JSON.stringify({ itemId, status }),
     }),
-  executions: (runId: string, itemId: string) =>
-    request<Execution[]>(`/test-runs/${runId}/items/${itemId}/executions`),
-  complete: (runId: string) =>
-    request(`/test-runs/${runId}/complete`, { method: "POST" }),
+  executions: (runId: string, itemId: string) => request<Execution[]>(`/test-runs/${runId}/items/${itemId}/executions`),
+  complete: (runId: string) => request(`/test-runs/${runId}/complete`, { method: "POST" }),
 };

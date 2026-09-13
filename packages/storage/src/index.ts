@@ -1,9 +1,4 @@
-import type {
-  TestExecution,
-  TestRun,
-  TestRunItem,
-  TestRunSuite,
-} from "@manual-test-manager/domain";
+import type { TestExecution, TestRun, TestRunItem, TestRunSuite } from "@manual-test-manager/domain";
 
 export interface Versioned<T> {
   value: T;
@@ -28,22 +23,13 @@ export interface TestRunSuiteRepository {
 }
 export interface TestRunItemRepository {
   create(item: TestRunItem): Promise<Versioned<TestRunItem>>;
-  get(
-    runId: string,
-    itemId: string,
-  ): Promise<Versioned<TestRunItem> | undefined>;
+  get(runId: string, itemId: string): Promise<Versioned<TestRunItem> | undefined>;
   listByRun(runId: string): Promise<Array<Versioned<TestRunItem>>>;
-  update(
-    item: TestRunItem,
-    expectedEtag: string,
-  ): Promise<Versioned<TestRunItem>>;
+  update(item: TestRunItem, expectedEtag: string): Promise<Versioned<TestRunItem>>;
 }
 export interface TestExecutionRepository {
   create(execution: TestExecution): Promise<Versioned<TestExecution>>;
-  listByItem(
-    runId: string,
-    itemId: string,
-  ): Promise<Array<Versioned<TestExecution>>>;
+  listByItem(runId: string, itemId: string): Promise<Array<Versioned<TestExecution>>>;
 }
 export interface RepositorySet {
   runs: TestRunRepository;
@@ -68,9 +54,7 @@ class InMemoryRuns implements TestRunRepository {
   }
   async get(id: string) {
     const result = this.values.get(id);
-    return result
-      ? { value: copy(result.value), etag: result.etag }
-      : undefined;
+    return result ? { value: copy(result.value), etag: result.etag } : undefined;
   }
   async update(run: TestRun) {
     if (!this.values.has(run.id)) throw new Error("run not found");
@@ -106,9 +90,7 @@ class InMemoryItems implements TestRunItemRepository {
   }
   async get(runId: string, itemId: string) {
     const result = this.values.get(`${runId}/${itemId}`);
-    return result
-      ? { value: copy(result.value), etag: result.etag }
-      : undefined;
+    return result ? { value: copy(result.value), etag: result.etag } : undefined;
   }
   async listByRun(runId: string) {
     return [...this.values.values()]
@@ -118,8 +100,7 @@ class InMemoryItems implements TestRunItemRepository {
   async update(item: TestRunItem, expectedEtag: string) {
     const key = `${item.runId}/${item.id}`;
     const current = this.values.get(key);
-    if (!current || current.etag !== expectedEtag)
-      throw new ETagConflictError();
+    if (!current || current.etag !== expectedEtag) throw new ETagConflictError();
     const result = { value: copy(item), etag: crypto.randomUUID() };
     this.values.set(key, result);
     return { value: copy(result.value), etag: result.etag };
@@ -130,17 +111,12 @@ class InMemoryExecutions implements TestExecutionRepository {
   private readonly values = new Map<string, Versioned<TestExecution>>();
   async create(execution: TestExecution) {
     const result = { value: copy(execution), etag: crypto.randomUUID() };
-    this.values.set(
-      `${execution.runId}/${execution.itemId}/${execution.id}`,
-      result,
-    );
+    this.values.set(`${execution.runId}/${execution.itemId}/${execution.id}`, result);
     return { value: copy(result.value), etag: result.etag };
   }
   async listByItem(runId: string, itemId: string) {
     return [...this.values.values()]
-      .filter(
-        (entry) => entry.value.runId === runId && entry.value.itemId === itemId,
-      )
+      .filter((entry) => entry.value.runId === runId && entry.value.itemId === itemId)
       .map((entry) => ({ value: copy(entry.value), etag: entry.etag }));
   }
 }

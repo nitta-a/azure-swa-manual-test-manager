@@ -1,6 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { createAzureDevOpsClient } from "./index.js";
+import { expect, test } from "vitest";
+import { createAzureDevOpsClient } from "../dist/index.js";
 
 test("maps pull requests and fetches files at a commit", async () => {
   const urls: string[] = [];
@@ -28,14 +27,14 @@ test("maps pull requests and fetches files at a commit", async () => {
       });
     },
   );
-  assert.deepEqual(await client.getPullRequest(7), {
+  expect(await client.getPullRequest(7)).toEqual({
     id: 7,
     title: "Fix",
     sourceBranch: "refs/heads/feature",
     targetBranch: "refs/heads/main",
     sourceCommitId: "abc",
   });
-  assert.equal(await client.getFile("tests/a.md", "abc"), "hello");
-  assert.equal(urls.length, 2);
-  assert.match(urls[1] ?? "", /versionDescriptor\.version=abc/);
+  expect(await client.getFile("tests/a.md", "abc")).toBe("hello");
+  expect(urls).toHaveLength(2);
+  expect(urls[1] ?? "").toMatch(/versionDescriptor\.version=abc/);
 });

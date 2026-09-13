@@ -1,6 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { ETagConflictError, InMemoryRepositories } from "./index.js";
+import { expect, test } from "vitest";
+import { ETagConflictError, InMemoryRepositories } from "../dist/index.js";
 
 test("detects stale item ETags", async () => {
   const repositories = new InMemoryRepositories();
@@ -16,13 +15,11 @@ test("detects stale item ETags", async () => {
     { ...created.value, status: "passed" },
     created.etag,
   );
-  await assert.rejects(
-    () =>
-      repositories.items.update(
-        { ...created.value, status: "failed" },
-        created.etag,
-      ),
-    ETagConflictError,
-  );
-  assert.equal(updated.value.status, "passed");
+  await expect(
+    repositories.items.update(
+      { ...created.value, status: "failed" },
+      created.etag,
+    ),
+  ).rejects.toThrowError(ETagConflictError);
+  expect(updated.value.status).toBe("passed");
 });

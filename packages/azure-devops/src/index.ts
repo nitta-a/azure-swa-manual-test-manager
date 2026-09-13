@@ -38,8 +38,7 @@ export function createAzureDevOpsClient(
   };
   async function request<T>(url: string): Promise<T> {
     const response = await fetchImpl(url, { headers });
-    if (!response.ok)
-      throw new Error(`Azure DevOps request failed (${response.status})`);
+    if (!response.ok) throw new Error(`Azure DevOps request failed (${response.status})`);
     return response.json() as Promise<T>;
   }
   const mapPullRequest = (pr: PullRequestResponse): PullRequest => ({
@@ -58,16 +57,13 @@ export function createAzureDevOpsClient(
     },
     async getPullRequest(pullRequestId) {
       return mapPullRequest(
-        await request<PullRequestResponse>(
-          `${base}/pullrequests/${pullRequestId}?api-version=7.1`,
-        ),
+        await request<PullRequestResponse>(`${base}/pullrequests/${pullRequestId}?api-version=7.1`),
       );
     },
     async getFile(path, commitId) {
       const url = `${base}/items?path=${encodeURIComponent(path)}&versionDescriptor.version=${encodeURIComponent(commitId)}&versionDescriptor.versionType=commit&includeContent=true&api-version=7.1`;
       const result = await request<{ content?: string }>(url);
-      if (typeof result.content !== "string")
-        throw new Error(`Azure DevOps file has no content: ${path}`);
+      if (typeof result.content !== "string") throw new Error(`Azure DevOps file has no content: ${path}`);
       return result.content;
     },
   };

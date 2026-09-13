@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test dist/*.test.js"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@azure/functions": "^4.16.2",
@@ -16,5 +16,8 @@
     "@manual-test-manager/markdown-parser": "workspace:*",
     "@manual-test-manager/storage": "workspace:*",
     "zod": "^4.6.4"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.0"
   }
 }

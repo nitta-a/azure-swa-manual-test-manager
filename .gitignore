@@ -7,6 +7,9 @@ dist/
 .azure/
 .swa/
 coverage/
+**/dist
+**/dist-tests
+**/node_modules
 
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md

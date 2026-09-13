@@ -1,12 +1,5 @@
-import {
-  type AzureDevOpsClient,
-  createAzureDevOpsClient,
-} from "@manual-test-manager/azure-devops";
-import {
-  createAzureTableRepositories,
-  InMemoryRepositories,
-  type RepositorySet,
-} from "@manual-test-manager/storage";
+import { type AzureDevOpsClient, createAzureDevOpsClient } from "@manual-test-manager/azure-devops";
+import { createAzureTableRepositories, InMemoryRepositories, type RepositorySet } from "@manual-test-manager/storage";
 import { TestRunService } from "./service.js";
 
 class MissingDevOpsConfiguration implements AzureDevOpsClient {
@@ -27,11 +20,8 @@ class MissingDevOpsConfiguration implements AzureDevOpsClient {
 }
 
 export async function createServiceFromEnvironment(): Promise<TestRunService> {
-  const repositories: RepositorySet = process.env
-    .AZURE_STORAGE_CONNECTION_STRING
-    ? await createAzureTableRepositories(
-        process.env.AZURE_STORAGE_CONNECTION_STRING,
-      )
+  const repositories: RepositorySet = process.env.AZURE_STORAGE_CONNECTION_STRING
+    ? await createAzureTableRepositories(process.env.AZURE_STORAGE_CONNECTION_STRING)
     : new InMemoryRepositories();
   const {
     ADO_ORGANIZATION_URL: organizationUrl,
@@ -43,9 +33,5 @@ export async function createServiceFromEnvironment(): Promise<TestRunService> {
     organizationUrl && project && repositoryId && pat
       ? createAzureDevOpsClient({ organizationUrl, project, repositoryId, pat })
       : new MissingDevOpsConfiguration();
-  return new TestRunService(
-    repositories,
-    devOps,
-    process.env.MANIFEST_PATH || ".manual-test-manifest.yml",
-  );
+  return new TestRunService(repositories, devOps, process.env.MANIFEST_PATH || ".manual-test-manifest.yml");
 }

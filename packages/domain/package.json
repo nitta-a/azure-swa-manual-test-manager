@@ -15,6 +15,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test dist/*.test.js"
+    "test": "vitest run tests"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.0"
   }
 }

@@ -1,6 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { MarkdownParseError, parseTestMarkdown } from "./index.js";
+import { expect, test } from "vitest";
+import { MarkdownParseError, parseTestMarkdown } from "../dist/index.js";
 
 test("parses legacy nested list and heading markdown to the same shape", () => {
   const legacy = parseTestMarkdown(
@@ -9,30 +8,26 @@ test("parses legacy nested list and heading markdown to the same shape", () => {
   const heading = parseTestMarkdown(
     "## TODO編集\n- [ ] TODOのタイトルを編集できる\n- [ ] TODOの期限を編集できる",
   );
-  assert.deepEqual(legacy, heading);
+  expect(legacy).toEqual(heading);
 });
 
 test("keeps heading hierarchy", () => {
-  assert.deepEqual(
+  expect(
     parseTestMarkdown("## TODO編集\n### タイトル\n- [ ] 空文字に変更できる"),
-    {
-      items: [
-        { hierarchy: ["TODO編集", "タイトル"], text: "空文字に変更できる" },
-      ],
-    },
-  );
+  ).toEqual({
+    items: [{ hierarchy: ["TODO編集", "タイトル"], text: "空文字に変更できる" }],
+  });
 });
 
 test("ignores prose, links, and blockquotes", () => {
-  assert.deepEqual(
+  expect(
     parseTestMarkdown(
       "説明\n> - [ ] 引用ではない\n- [link](https://example.com)",
     ),
-    { items: [] },
-  );
+  ).toEqual({ items: [] });
 });
 
 test("rejects malformed or empty checkbox items", () => {
-  assert.throws(() => parseTestMarkdown("- [x]"), MarkdownParseError);
-  assert.throws(() => parseTestMarkdown("- [/] bad"), MarkdownParseError);
+  expect(() => parseTestMarkdown("- [x]")).toThrowError(MarkdownParseError);
+  expect(() => parseTestMarkdown("- [/] bad")).toThrowError(MarkdownParseError);
 });

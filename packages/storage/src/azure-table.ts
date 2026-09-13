@@ -1,14 +1,5 @@
-import {
-  TableClient,
-  type TableEntity,
-  type TableEntityResult,
-} from "@azure/data-tables";
-import type {
-  TestExecution,
-  TestRun,
-  TestRunItem,
-  TestRunSuite,
-} from "@manual-test-manager/domain";
+import { TableClient, type TableEntity, type TableEntityResult } from "@azure/data-tables";
+import type { TestExecution, TestRun, TestRunItem, TestRunSuite } from "@manual-test-manager/domain";
 import type {
   RepositorySet,
   TestExecutionRepository,
@@ -27,28 +18,18 @@ function entity<T>(value: T, partitionKey: string, rowKey: string): Stored<T> {
 
 function fromEntity<T>(result: TableEntityResult<Stored<T>>): Versioned<T> {
   const value = Object.fromEntries(
-    Object.entries(result).filter(
-      ([key]) => !["partitionKey", "rowKey", "etag", "timestamp"].includes(key),
-    ),
+    Object.entries(result).filter(([key]) => !["partitionKey", "rowKey", "etag", "timestamp"].includes(key)),
   ) as T;
   return { value, etag: result.etag ?? "" };
 }
 
-function itemEntity(
-  item: TestRunItem,
-): Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }> {
+function itemEntity(item: TestRunItem): Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }> {
   const { hierarchy, ...rest } = item;
-  return entity(
-    { ...rest, hierarchy: JSON.stringify(hierarchy) },
-    item.runId,
-    item.id,
-  );
+  return entity({ ...rest, hierarchy: JSON.stringify(hierarchy) }, item.runId, item.id);
 }
 
 function itemFromEntity(
-  result: TableEntityResult<
-    Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>
-  >,
+  result: TableEntityResult<Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>>,
 ): Versioned<TestRunItem> {
   const parsed = fromEntity(result);
   return {
@@ -75,10 +56,7 @@ class RunTable implements TestRunRepository {
     return result.done ? undefined : fromEntity(result.value);
   }
   async update(run: TestRun) {
-    await this.table.upsertEntity(
-      entity(run, run.repositoryId, run.id),
-      "Merge",
-    );
+    await this.table.upsertEntity(entity(run, run.repositoryId, run.id), "Merge");
     return this.get(run.id) as Promise<Versioned<TestRun>>;
   }
 }
@@ -88,9 +66,7 @@ class SuiteTable implements TestRunSuiteRepository {
   async create(suite: TestRunSuite) {
     await this.table.createEntity(entity(suite, suite.runId, suite.suiteId));
     const all = await this.listByRun(suite.runId);
-    return all.find(
-      (entry) => entry.value.suiteId === suite.suiteId,
-    ) as Versioned<TestRunSuite>;
+    return all.find((entry) => entry.value.suiteId === suite.suiteId) as Versioned<TestRunSuite>;
   }
   async listByRun(runId: string) {
     const output: Array<Versioned<TestRunSuite>> = [];
@@ -113,9 +89,7 @@ class ItemTable implements TestRunItemRepository {
   async get(runId: string, itemId: string) {
     try {
       return itemFromEntity(
-        await this.table.getEntity<
-          Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>
-        >(runId, itemId),
+        await this.table.getEntity<Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>>(runId, itemId),
       );
     } catch (error) {
       if (isNotFound(error)) return undefined;
@@ -124,9 +98,7 @@ class ItemTable implements TestRunItemRepository {
   }
   async listByRun(runId: string) {
     const output: Array<Versioned<TestRunItem>> = [];
-    for await (const item of this.table.listEntities<
-      Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>
-    >({
+    for await (const item of this.table.listEntities<Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>>({
       queryOptions: {
         filter: `PartitionKey eq '${runId.replaceAll("'", "''")}'`,
       },
@@ -151,28 +123,16 @@ class ItemTable implements TestRunItemRepository {
 }
 
 function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "statusCode" in error &&
-    error.statusCode === 404
-  );
+  return typeof error === "object" && error !== null && "statusCode" in error && error.statusCode === 404;
 }
 function isPrecondition(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "statusCode" in error &&
-    error.statusCode === 412
-  );
+  return typeof error === "object" && error !== null && "statusCode" in error && error.statusCode === 412;
 }
 
 class ExecutionTable implements TestExecutionRepository {
   constructor(private readonly table: TableClient) {}
   async create(execution: TestExecution) {
-    await this.table.createEntity(
-      entity(execution, execution.runId, `${execution.itemId}_${execution.id}`),
-    );
+    await this.table.createEntity(entity(execution, execution.runId, `${execution.itemId}_${execution.id}`));
     return { value: execution, etag: "" };
   }
   async listByItem(runId: string, itemId: string) {
@@ -197,21 +157,12 @@ export async function createAzureTableRepositories(
   },
 ): Promise<RepositorySet> {
   const clients = Object.fromEntries(
-    Object.entries(tableNames).map(([key, name]) => [
-      key,
-      TableClient.fromConnectionString(connectionString, name),
-    ]),
+    Object.entries(tableNames).map(([key, name]) => [key, TableClient.fromConnectionString(connectionString, name)]),
   ) as Record<keyof typeof tableNames, TableClient>;
   await Promise.all(
     Object.values(clients).map((client) =>
       client.createTable().catch((error: unknown) => {
-        if (
-          !(
-            error instanceof Error &&
-            error.message.includes("TableAlreadyExists")
-          )
-        )
-          throw error;
+        if (!(error instanceof Error && error.message.includes("TableAlreadyExists"))) throw error;
       }),
     ),
   );

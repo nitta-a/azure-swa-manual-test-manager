@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect, test } from "vitest";
 import type { AzureDevOpsClient } from "@manual-test-manager/azure-devops";
 import { InMemoryRepositories } from "@manual-test-manager/storage";
 import { TestRunService } from "./service.js";
@@ -44,13 +43,14 @@ test("starts from a commit snapshot and records execution history", async () => 
     startedBy: "user",
   });
   const items = await service.listItems(created.value.id);
-  assert.equal(items.length, 1);
+  expect(items).toHaveLength(1);
   const firstItem = items[0];
-  assert.ok(firstItem);
+  expect(firstItem).toBeTruthy();
+  if (!firstItem) throw new Error("test item fixture is missing");
   suiteMarkdown = "## TODO\n- [ ] changed after run";
   const [suite] = await repositories.suites.listByRun(created.value.id);
-  assert.ok(suite);
-  assert.equal(suite.value.sourceMarkdown, "## TODO\n- [ ] works");
+  expect(suite).toBeTruthy();
+  expect(suite?.value.sourceMarkdown).toBe("## TODO\n- [ ] works");
   const executed = await service.execute(created.value.id, {
     itemId: firstItem.value.id,
     status: "passed",
@@ -58,20 +58,16 @@ test("starts from a commit snapshot and records execution history", async () => 
     expectedEtag: firstItem.etag,
     comment: "done",
   });
-  assert.equal(
-    (
-      await repositories.executions.listByItem(
-        created.value.id,
-        firstItem.value.id,
-      )
-    ).length,
-    1,
-  );
-  assert.equal(executed.item.value.status, "passed");
+  expect(
+    await repositories.executions.listByItem(
+      created.value.id,
+      firstItem.value.id,
+    ),
+  ).toHaveLength(1);
+  expect(executed.item.value.status).toBe("passed");
   await service.complete(created.value.id, "user");
-  assert.equal((await service.get(created.value.id)).value.state, "completed");
-  assert.equal(
-    (await service.reopen(created.value.id)).value.state,
+  expect((await service.get(created.value.id)).value.state).toBe("completed");
+  expect((await service.reopen(created.value.id)).value.state).toBe(
     "inProgress",
   );
 });

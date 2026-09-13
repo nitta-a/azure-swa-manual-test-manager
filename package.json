@@ -9,7 +9,7 @@
     "build": "pnpm run build:packages && pnpm --filter @manual-test-manager/api build && pnpm --filter @manual-test-manager/web build",
     "build:packages": "pnpm --filter @manual-test-manager/domain build && pnpm --filter @manual-test-manager/manifest build && pnpm --filter @manual-test-manager/markdown-parser build && pnpm --filter @manual-test-manager/azure-devops build && pnpm --filter @manual-test-manager/storage build",
     "typecheck": "pnpm run build:packages && pnpm --filter @manual-test-manager/api typecheck && pnpm --filter @manual-test-manager/web typecheck",
-    "test": "pnpm run build && pnpm --filter @manual-test-manager/domain test && pnpm --filter @manual-test-manager/manifest test && pnpm --filter @manual-test-manager/markdown-parser test && pnpm --filter @manual-test-manager/azure-devops test && pnpm --filter @manual-test-manager/storage test && pnpm --filter @manual-test-manager/api test",
+    "test": "pnpm run build && pnpm --filter @manual-test-manager/domain test && pnpm --filter @manual-test-manager/manifest test && pnpm --filter @manual-test-manager/markdown-parser test && pnpm --filter @manual-test-manager/azure-devops test && pnpm --filter @manual-test-manager/storage test && pnpm --filter @manual-test-manager/api test && pnpm --filter @manual-test-manager/web test",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
