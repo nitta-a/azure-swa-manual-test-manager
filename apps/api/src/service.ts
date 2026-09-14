@@ -1,14 +1,18 @@
 import type { AzureDevOpsClient, PullRequest } from "@manual-test-manager/azure-devops";
 import type { TestExecution, TestRun, TestRunItem, TestStatus } from "@manual-test-manager/domain";
 import type { ManifestV1 } from "@manual-test-manager/manifest";
+import type { SourceControlClient } from "@manual-test-manager/source-control";
 import type { RepositorySet, Versioned } from "@manual-test-manager/storage";
 import type { ServiceContext } from "./service/context.js";
+import type { DefinitionContent } from "./service/definitions.js";
+import * as definitions from "./service/definitions.js";
+import { ServiceError } from "./service/errors.js";
 import { execute as executeItem, listExecutions as listItemExecutions } from "./service/executions.js";
 import {
   getTestDefinition as getDefinitionFromDevOps,
-  getPullRequest as getPullRequestFromDevOps,
   listPullRequests as listPullRequestsFromDevOps,
 } from "./service/pull-requests.js";
+import type { DefinitionSource } from "./service/resolver.js";
 import {
   cancel as cancelRun,
   complete as completeRun,
@@ -21,8 +25,12 @@ import {
 export { ServiceError } from "./service/errors.js";
 
 export interface StartTestRunInput {
-  repositoryId: string;
-  pullRequestId: number;
+  source?:
+    | { type: "azureRepos"; repositoryId: string; pullRequestId: number }
+    | { type: "github"; repositoryId: string; pullRequestId: number }
+    | { type: "appManaged"; definitionId: string };
+  repositoryId?: string;
+  pullRequestId?: number;
   suiteIds: string[];
   startedBy: string;
 }
@@ -49,20 +57,34 @@ export class TestRunService {
     devOps: AzureDevOpsClient,
     manifestPath: string,
     now: () => string = () => new Date().toISOString(),
+    options: { providers?: Partial<Record<"azureRepos" | "github", SourceControlClient>>; projectId?: string } = {},
   ) {
-    this.context = { repositories, devOps, manifestPath, now };
+    this.context = {
+      repositories,
+      devOps,
+      manifestPath,
+      now,
+      providers: { azureRepos: devOps, ...options.providers },
+      projectId: options.projectId || "default",
+    };
   }
 
-  listPullRequests(): Promise<PullRequest[]> {
-    return listPullRequestsFromDevOps(this.context.devOps);
+  listPullRequests(provider: "azureRepos" | "github" = "azureRepos"): Promise<PullRequest[]> {
+    return listPullRequestsFromDevOps(this.context, provider);
   }
 
-  getPullRequest(id: number): Promise<PullRequest> {
-    return getPullRequestFromDevOps(this.context.devOps, id);
+  getPullRequest(id: number, provider: "azureRepos" | "github" = "azureRepos"): Promise<PullRequest> {
+    const client = this.context.providers[provider];
+    if (!client) return Promise.reject(new ServiceError(503, `${provider} is not configured`));
+    return client.getPullRequest(id);
   }
 
-  getTestDefinition(pullRequestId: number): Promise<TestDefinition> {
-    return getDefinitionFromDevOps(this.context, pullRequestId);
+  getTestDefinition(
+    pullRequestId: number,
+    provider: "azureRepos" | "github" = "azureRepos",
+    repositoryId = "repository",
+  ): Promise<TestDefinition> {
+    return getDefinitionFromDevOps(this.context, pullRequestId, provider, repositoryId);
   }
 
   start(input: StartTestRunInput): Promise<Versioned<TestRun>> {
@@ -101,5 +123,27 @@ export class TestRunService {
 
   cancel(runId: string): Promise<Versioned<TestRun>> {
     return cancelRun(this.context, runId);
+  }
+
+  listTestDefinitions() {
+    return definitions.list(this.context);
+  }
+  getTestDefinitionById(id: string) {
+    return definitions.get(this.context, id);
+  }
+  listDefinitionRevisions(id: string) {
+    return definitions.revisions(this.context, id);
+  }
+  createTestDefinition(name: string, content: DefinitionContent, userId: string) {
+    return definitions.create(this.context, name, content, userId);
+  }
+  updateTestDefinition(id: string, name: string, content: DefinitionContent, userId: string, etag: string) {
+    return definitions.update(this.context, id, name, content, userId, etag);
+  }
+  deleteTestDefinition(id: string, etag: string) {
+    return definitions.remove(this.context, id, etag);
+  }
+  importTestDefinition(source: DefinitionSource, suiteIds: string[], name: string, userId: string) {
+    return definitions.importDefinition(this.context, source, suiteIds, name, userId);
   }
 }

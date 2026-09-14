@@ -1,9 +1,6 @@
-import { expect, test } from "vitest";
-import type {
-  AzureDevOpsClient,
-  PullRequest,
-} from "@manual-test-manager/azure-devops";
+import type { AzureDevOpsClient, PullRequest } from "@manual-test-manager/azure-devops";
 import { InMemoryRepositories } from "@manual-test-manager/storage";
+import { expect, test } from "vitest";
 import { TestRunService } from "../src/service.js";
 
 const pullRequest: PullRequest = {
@@ -46,19 +43,11 @@ function fixture() {
     },
   };
   const repositories = new InMemoryRepositories();
-  const service = new TestRunService(
-    repositories,
-    devOps,
-    "manifest.yml",
-    () => "2026-01-01T00:00:00.000Z",
-  );
+  const service = new TestRunService(repositories, devOps, "manifest.yml", () => "2026-01-01T00:00:00.000Z");
   return { fileRequests, repositories, service };
 }
 
-async function startRun(
-  service: TestRunService,
-  suiteIds: string[] = ["smoke"],
-) {
+async function startRun(service: TestRunService, suiteIds: string[] = ["smoke"]) {
   return service.start({
     repositoryId: "repo-1",
     pullRequestId: pullRequest.id,
@@ -71,16 +60,11 @@ test("lists pull requests and reads a definition at the PR source commit", async
   const { fileRequests, service } = fixture();
 
   await expect(service.listPullRequests()).resolves.toEqual([pullRequest]);
-  await expect(service.getPullRequest(pullRequest.id)).resolves.toEqual(
-    pullRequest,
-  );
+  await expect(service.getPullRequest(pullRequest.id)).resolves.toEqual(pullRequest);
   const definition = await service.getTestDefinition(pullRequest.id);
 
   expect(definition.pullRequest).toEqual(pullRequest);
-  expect(definition.manifest.suites.map((suite) => suite.id)).toEqual([
-    "smoke",
-    "regression",
-  ]);
+  expect(definition.manifest.suites.map((suite) => suite.id)).toEqual(["smoke", "regression"]);
   expect(fileRequests).toContainEqual({
     path: "manifest.yml",
     commitId: "commit-42",
@@ -131,7 +115,7 @@ test("creates a run with suite, item, and source snapshots", async () => {
 });
 
 test("returns a run with its suites and items and records executions", async () => {
-  const { repositories, service } = fixture();
+  const { service } = fixture();
   const created = await startRun(service);
   const [item] = await service.listItems(created.value.id);
   if (!item) throw new Error("item fixture is missing");
@@ -144,10 +128,7 @@ test("returns a run with its suites and items and records executions", async () 
     comment: "looks good",
   });
   const run = await service.get(created.value.id);
-  const executions = await service.listExecutions(
-    created.value.id,
-    item.value.id,
-  );
+  const executions = await service.listExecutions(created.value.id, item.value.id);
 
   expect(run.value).toEqual(created.value);
   expect(run.suites).toHaveLength(1);

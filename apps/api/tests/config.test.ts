@@ -10,9 +10,7 @@ const environmentKeys = [
   "MANIFEST_PATH",
 ] as const;
 
-const originalEnvironment = new Map(
-  environmentKeys.map((key) => [key, process.env[key]]),
-);
+const originalEnvironment = new Map(environmentKeys.map((key) => [key, process.env[key]]));
 
 afterEach(() => {
   for (const key of environmentKeys) {
@@ -31,7 +29,9 @@ test("uses in-memory repositories when storage is not configured", async () => {
     status: 404,
     message: "test run not found",
   });
-  expect(() => service.listPullRequests()).toThrow(
-    "Azure DevOps is not configured",
-  );
+  await expect(service.listPullRequests()).rejects.toThrow("Azure DevOps is not configured");
+  await expect(service.listPullRequests("github")).rejects.toMatchObject({
+    status: 503,
+    message: "github is not configured",
+  });
 });

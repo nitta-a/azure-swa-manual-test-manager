@@ -1,19 +1,29 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api";
 
 export function usePullRequest() {
   const { pullRequestId = "" } = useParams();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const provider = params.get("provider") === "github" ? "github" : "azureRepos";
+  const selectedRepositoryId =
+    provider === "github"
+      ? import.meta.env.VITE_GITHUB_REPOSITORY || "repository"
+      : import.meta.env.VITE_REPOSITORY_ID || "repository";
   const [selected, setSelected] = useState<string[]>([]);
   const definition = useQuery({
-    queryKey: ["definition", pullRequestId],
-    queryFn: () => api.getDefinition(pullRequestId),
+    queryKey: ["definition", provider, pullRequestId],
+    queryFn: () => api.getDefinition(pullRequestId, provider),
     enabled: Boolean(pullRequestId),
   });
   const startRun = useMutation({
-    mutationFn: () => api.startRun(Number(pullRequestId), selected),
+    mutationFn: () =>
+      api.startRun(
+        { type: provider, repositoryId: selectedRepositoryId, pullRequestId: Number(pullRequestId) },
+        selected,
+      ),
     onSuccess: (run) => navigate(`/test-runs/${run.value.id}`),
   });
 

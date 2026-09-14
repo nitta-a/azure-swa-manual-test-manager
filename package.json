@@ -1,15 +1,15 @@
 {
   "name": "manual-test-manager",
   "private": true,
-  "packageManager": "pnpm@10.15.0",
+  "packageManager": "pnpm@12.0.0",
   "engines": {
     "node": ">=22 <25"
   },
   "scripts": {
     "build": "pnpm run build:packages && pnpm --filter @manual-test-manager/api build && pnpm --filter @manual-test-manager/web build",
-    "build:packages": "pnpm --filter @manual-test-manager/domain build && pnpm --filter @manual-test-manager/manifest build && pnpm --filter @manual-test-manager/markdown-parser build && pnpm --filter @manual-test-manager/azure-devops build && pnpm --filter @manual-test-manager/storage build",
+    "build:packages": "pnpm --filter @manual-test-manager/domain build && pnpm --filter @manual-test-manager/manifest build && pnpm --filter @manual-test-manager/markdown-parser build && pnpm --filter @manual-test-manager/source-control build && pnpm --filter @manual-test-manager/azure-devops build && pnpm --filter @manual-test-manager/github build && pnpm --filter @manual-test-manager/storage build",
     "typecheck": "pnpm run build:packages && pnpm --filter @manual-test-manager/api typecheck && pnpm --filter @manual-test-manager/web typecheck",
-    "test": "pnpm run build && pnpm --filter @manual-test-manager/domain test && pnpm --filter @manual-test-manager/manifest test && pnpm --filter @manual-test-manager/markdown-parser test && pnpm --filter @manual-test-manager/azure-devops test && pnpm --filter @manual-test-manager/storage test && pnpm --filter @manual-test-manager/api test && pnpm --filter @manual-test-manager/web test",
+    "test": "pnpm run build && pnpm --filter @manual-test-manager/domain test && pnpm --filter @manual-test-manager/manifest test && pnpm --filter @manual-test-manager/markdown-parser test && pnpm --filter @manual-test-manager/source-control test && pnpm --filter @manual-test-manager/azure-devops test && pnpm --filter @manual-test-manager/github test && pnpm --filter @manual-test-manager/storage test && pnpm --filter @manual-test-manager/api test && pnpm --filter @manual-test-manager/web test",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",

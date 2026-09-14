@@ -1,5 +1,5 @@
 {
-  "name": "@manual-test-manager/azure-devops",
+  "name": "@manual-test-manager/source-control",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,5 @@
   },
   "devDependencies": {
     "vitest": "^5.0.0"
-  },
-  "dependencies": {
-    "@manual-test-manager/source-control": "workspace:*"
   }
 }

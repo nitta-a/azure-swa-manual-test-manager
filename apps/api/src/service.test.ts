@@ -1,6 +1,6 @@
-import { expect, test } from "vitest";
 import type { AzureDevOpsClient } from "@manual-test-manager/azure-devops";
 import { InMemoryRepositories } from "@manual-test-manager/storage";
+import { expect, test } from "vitest";
 import { TestRunService } from "./service.js";
 
 let suiteMarkdown = "## TODO\n- [ ] works";
@@ -30,12 +30,7 @@ const devOps: AzureDevOpsClient = {
 
 test("starts from a commit snapshot and records execution history", async () => {
   const repositories = new InMemoryRepositories();
-  const service = new TestRunService(
-    repositories,
-    devOps,
-    "manifest.yml",
-    () => "2026-01-01T00:00:00.000Z",
-  );
+  const service = new TestRunService(repositories, devOps, "manifest.yml", () => "2026-01-01T00:00:00.000Z");
   const created = await service.start({
     repositoryId: "repo",
     pullRequestId: 1,
@@ -58,16 +53,9 @@ test("starts from a commit snapshot and records execution history", async () => 
     expectedEtag: firstItem.etag,
     comment: "done",
   });
-  expect(
-    await repositories.executions.listByItem(
-      created.value.id,
-      firstItem.value.id,
-    ),
-  ).toHaveLength(1);
+  expect(await repositories.executions.listByItem(created.value.id, firstItem.value.id)).toHaveLength(1);
   expect(executed.item.value.status).toBe("passed");
   await service.complete(created.value.id, "user");
   expect((await service.get(created.value.id)).value.state).toBe("completed");
-  expect((await service.reopen(created.value.id)).value.state).toBe(
-    "inProgress",
-  );
+  expect((await service.reopen(created.value.id)).value.state).toBe("inProgress");
 });

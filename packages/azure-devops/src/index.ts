@@ -1,16 +1,7 @@
-export interface PullRequest {
-  id: number;
-  title: string;
-  sourceBranch: string;
-  targetBranch: string;
-  sourceCommitId: string;
-}
+import type { PullRequestRef, SourceControlClient } from "@manual-test-manager/source-control";
 
-export interface AzureDevOpsClient {
-  listPullRequests(): Promise<PullRequest[]>;
-  getPullRequest(pullRequestId: number): Promise<PullRequest>;
-  getFile(path: string, commitId: string): Promise<string>;
-}
+export type PullRequest = PullRequestRef;
+export type AzureDevOpsClient = SourceControlClient;
 
 export interface AzureDevOpsClientConfig {
   organizationUrl: string;

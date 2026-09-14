@@ -1,5 +1,5 @@
 {
-  "name": "@manual-test-manager/azure-devops",
+  "name": "@manual-test-manager/github",
   "version": "0.1.0",
   "private": true,
   "type": "module",

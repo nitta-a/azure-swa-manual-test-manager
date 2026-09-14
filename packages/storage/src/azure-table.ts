@@ -1,7 +1,20 @@
 import { TableClient, type TableEntity, type TableEntityResult } from "@azure/data-tables";
-import type { TestExecution, TestRun, TestRunItem, TestRunSuite } from "@manual-test-manager/domain";
+import type {
+  TestDefinition,
+  TestDefinitionItem,
+  TestDefinitionRevision,
+  TestDefinitionSuite,
+  TestExecution,
+  TestRun,
+  TestRunItem,
+  TestRunSuite,
+} from "@manual-test-manager/domain";
 import type {
   RepositorySet,
+  TestDefinitionItemRepository,
+  TestDefinitionRepository,
+  TestDefinitionRevisionRepository,
+  TestDefinitionSuiteRepository,
   TestExecutionRepository,
   TestRunItemRepository,
   TestRunRepository,
@@ -21,6 +34,10 @@ function fromEntity<T>(result: TableEntityResult<Stored<T>>): Versioned<T> {
     Object.entries(result).filter(([key]) => !["partitionKey", "rowKey", "etag", "timestamp"].includes(key)),
   ) as T;
   return { value, etag: result.etag ?? "" };
+}
+
+function normalizeRun(result: Versioned<TestRun>): Versioned<TestRun> {
+  return { etag: result.etag, value: { ...result.value, sourceType: result.value.sourceType || "azureRepos" } };
 }
 
 function itemEntity(item: TestRunItem): Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }> {
@@ -44,7 +61,7 @@ function itemFromEntity(
 class RunTable implements TestRunRepository {
   constructor(private readonly table: TableClient) {}
   async create(run: TestRun) {
-    await this.table.createEntity(entity(run, run.repositoryId, run.id));
+    await this.table.createEntity(entity(run, run.repositoryId || run.definitionId || "app-managed", run.id));
     return this.get(run.id) as Promise<Versioned<TestRun>>;
   }
   async get(runId: string) {
@@ -53,10 +70,10 @@ class RunTable implements TestRunRepository {
         queryOptions: { filter: `RowKey eq '${runId.replaceAll("'", "''")}'` },
       })
       .next();
-    return result.done ? undefined : fromEntity(result.value);
+    return result.done ? undefined : normalizeRun(fromEntity(result.value));
   }
   async update(run: TestRun) {
-    await this.table.upsertEntity(entity(run, run.repositoryId, run.id), "Merge");
+    await this.table.upsertEntity(entity(run, run.repositoryId || run.definitionId || "app-managed", run.id), "Merge");
     return this.get(run.id) as Promise<Versioned<TestRun>>;
   }
 }
@@ -147,6 +164,142 @@ class ExecutionTable implements TestExecutionRepository {
   }
 }
 
+class DefinitionTable implements TestDefinitionRepository {
+  constructor(private readonly table: TableClient) {}
+  async create(definition: TestDefinition) {
+    await this.table.createEntity(entity(definition, definition.projectId, definition.id));
+    return this.get(definition.projectId, definition.id) as Promise<Versioned<TestDefinition>>;
+  }
+  async get(projectId: string, definitionId: string) {
+    try {
+      return fromEntity(await this.table.getEntity<Stored<TestDefinition>>(projectId, definitionId));
+    } catch (error) {
+      if (isNotFound(error)) return undefined;
+      throw error;
+    }
+  }
+  async list(projectId: string) {
+    const output: Array<Versioned<TestDefinition>> = [];
+    for await (const item of this.table.listEntities<Stored<TestDefinition>>({
+      queryOptions: { filter: `PartitionKey eq '${projectId.replaceAll("'", "''")}'` },
+    }))
+      if (!item.archived) output.push(fromEntity(item));
+    return output;
+  }
+  async update(definition: TestDefinition, expectedEtag: string) {
+    try {
+      await this.table.updateEntity(
+        { ...entity(definition, definition.projectId, definition.id), etag: expectedEtag } as TableEntity<
+          Stored<TestDefinition>
+        >,
+        "Replace",
+      );
+      return this.get(definition.projectId, definition.id) as Promise<Versioned<TestDefinition>>;
+    } catch (error) {
+      if (isPrecondition(error)) throw new ETagConflictError();
+      throw error;
+    }
+  }
+  async delete(projectId: string, definitionId: string) {
+    const current = await this.get(projectId, definitionId);
+    if (!current) return;
+    await this.update({ ...current.value, archived: true }, current.etag);
+  }
+}
+
+class RevisionTable implements TestDefinitionRevisionRepository {
+  constructor(private readonly table: TableClient) {}
+  async create(revision: TestDefinitionRevision) {
+    const stored = {
+      ...revision,
+      importedFrom: revision.importedFrom ? JSON.stringify(revision.importedFrom) : undefined,
+    };
+    await this.table.createEntity(entity(stored, revision.definitionId, revision.id));
+    return this.get(revision.definitionId, revision.id) as Promise<Versioned<TestDefinitionRevision>>;
+  }
+  async get(definitionId: string, revisionId: string) {
+    try {
+      const result = fromEntity(
+        await this.table.getEntity<Stored<Omit<TestDefinitionRevision, "importedFrom"> & { importedFrom?: string }>>(
+          definitionId,
+          revisionId,
+        ),
+      );
+      return {
+        etag: result.etag,
+        value: {
+          ...result.value,
+          importedFrom: result.value.importedFrom ? JSON.parse(result.value.importedFrom) : undefined,
+        },
+      };
+    } catch (error) {
+      if (isNotFound(error)) return undefined;
+      throw error;
+    }
+  }
+  async listByDefinition(definitionId: string) {
+    const output: Array<Versioned<TestDefinitionRevision>> = [];
+    for await (const item of this.table.listEntities<
+      Stored<Omit<TestDefinitionRevision, "importedFrom"> & { importedFrom?: string }>
+    >({
+      queryOptions: { filter: `PartitionKey eq '${definitionId.replaceAll("'", "''")}'` },
+    })) {
+      const parsed = fromEntity(item);
+      output.push({
+        etag: parsed.etag,
+        value: {
+          ...parsed.value,
+          importedFrom: parsed.value.importedFrom ? JSON.parse(parsed.value.importedFrom) : undefined,
+        },
+      });
+    }
+    return output;
+  }
+}
+
+class DefinitionSuiteTable implements TestDefinitionSuiteRepository {
+  constructor(private readonly table: TableClient) {}
+  async create(suite: TestDefinitionSuite) {
+    await this.table.createEntity(entity(suite, suite.revisionId, suite.id));
+    const values = await this.listByRevision(suite.revisionId);
+    return values.find((entry) => entry.value.id === suite.id) as Versioned<TestDefinitionSuite>;
+  }
+  async listByRevision(revisionId: string) {
+    const output: Array<Versioned<TestDefinitionSuite>> = [];
+    for await (const item of this.table.listEntities<Stored<TestDefinitionSuite>>({
+      queryOptions: { filter: `PartitionKey eq '${revisionId.replaceAll("'", "''")}'` },
+    }))
+      output.push(fromEntity(item));
+    return output.sort((a, b) => a.value.order - b.value.order);
+  }
+}
+
+class DefinitionItemTable implements TestDefinitionItemRepository {
+  constructor(private readonly table: TableClient) {}
+  async create(item: TestDefinitionItem) {
+    await this.table.createEntity(
+      entity({ ...item, hierarchy: JSON.stringify(item.hierarchy) }, item.revisionId, item.id),
+    );
+    const values = await this.listByRevision(item.revisionId);
+    return values.find((entry) => entry.value.id === item.id) as Versioned<TestDefinitionItem>;
+  }
+  async listByRevision(revisionId: string) {
+    const output: Array<Versioned<TestDefinitionItem>> = [];
+    for await (const item of this.table.listEntities<
+      Stored<Omit<TestDefinitionItem, "hierarchy"> & { hierarchy: string }>
+    >({
+      queryOptions: { filter: `PartitionKey eq '${revisionId.replaceAll("'", "''")}'` },
+    })) {
+      const parsed = fromEntity(item);
+      output.push({
+        etag: parsed.etag,
+        value: { ...parsed.value, hierarchy: JSON.parse(parsed.value.hierarchy) as string[] },
+      });
+    }
+    return output.sort((a, b) => a.value.order - b.value.order);
+  }
+}
+
 export async function createAzureTableRepositories(
   connectionString: string,
   tableNames = {
@@ -154,6 +307,10 @@ export async function createAzureTableRepositories(
     suites: "TestRunSuites",
     items: "TestRunItems",
     executions: "TestExecutions",
+    definitions: "TestDefinitions",
+    definitionRevisions: "TestDefinitionRevisions",
+    definitionSuites: "TestDefinitionSuites",
+    definitionItems: "TestDefinitionItems",
   },
 ): Promise<RepositorySet> {
   const clients = Object.fromEntries(
@@ -171,5 +328,9 @@ export async function createAzureTableRepositories(
     suites: new SuiteTable(clients.suites),
     items: new ItemTable(clients.items),
     executions: new ExecutionTable(clients.executions),
+    definitions: new DefinitionTable(clients.definitions),
+    definitionRevisions: new RevisionTable(clients.definitionRevisions),
+    definitionSuites: new DefinitionSuiteTable(clients.definitionSuites),
+    definitionItems: new DefinitionItemTable(clients.definitionItems),
   };
 }

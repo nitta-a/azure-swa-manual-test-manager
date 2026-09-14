@@ -7,6 +7,11 @@
     "ADO_PROJECT": "your-project",
     "ADO_REPOSITORY_ID": "your-repository-id",
     "ADO_PAT": "set-locally-only",
-    "MANIFEST_PATH": ".manual-test-manifest.yml"
+    "MANIFEST_PATH": ".manual-test-manifest.yml",
+    "PROJECT_ID": "default",
+    "GITHUB_OWNER": "",
+    "GITHUB_REPOSITORY": "",
+    "GITHUB_TOKEN": "",
+    "GITHUB_API_URL": "https://api.github.com"
   }
 }

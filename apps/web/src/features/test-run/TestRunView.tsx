@@ -23,7 +23,10 @@ export function TestRunView() {
           <>
             <p>
               状態: <strong>{run.data.value.state}</strong> {run.data.value.result ? `(${run.data.value.result})` : ""}{" "}
-              · snapshot commit: <code>{run.data.value.sourceCommitId}</code>
+              · source snapshot:{" "}
+              <code>
+                {run.data.value.sourceCommitId || run.data.value.definitionRevisionId || run.data.value.sourceType}
+              </code>
             </p>
             <ol className="items">
               {run.data.items.map((item) => (

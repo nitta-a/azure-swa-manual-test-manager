@@ -2,15 +2,27 @@ import { z } from "zod";
 import { type Handler, params, principalUserId } from "../http.js";
 
 const id = z.string().trim().min(1);
+const sourceSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("azureRepos"), repositoryId: id, pullRequestId: z.number().int().positive() }),
+  z.object({ type: z.literal("github"), repositoryId: id, pullRequestId: z.number().int().positive() }),
+  z.object({ type: z.literal("appManaged"), definitionId: id }),
+]);
 const startSchema = z.object({
-  repositoryId: id,
-  pullRequestId: z.number().int().positive(),
+  source: sourceSchema.optional(),
+  repositoryId: id.optional(),
+  pullRequestId: z.number().int().positive().optional(),
   suiteIds: z.array(id).min(1),
 });
 
 export const createTestRun: Handler = async (request, _context, service) => {
   const body = startSchema.parse(await request.json());
-  return service.start({ ...body, startedBy: principalUserId(request) });
+  const input = { suiteIds: body.suiteIds, startedBy: principalUserId(request) };
+  if (body.source) return service.start({ ...input, source: body.source });
+  return service.start({
+    ...input,
+    ...(body.repositoryId ? { repositoryId: body.repositoryId } : {}),
+    ...(body.pullRequestId ? { pullRequestId: body.pullRequestId } : {}),
+  });
 };
 
 export const getTestRun: Handler = async (request, _context, service) => service.get(params(request, "runId"));

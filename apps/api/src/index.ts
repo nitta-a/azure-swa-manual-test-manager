@@ -2,6 +2,16 @@ import { app } from "@azure/functions";
 import { createTestExecution, getTestExecutions } from "./handlers/executions.js";
 import { getPullRequest, getTestDefinition, listPullRequests } from "./handlers/pull-requests.js";
 import {
+  createTestDefinition,
+  deleteTestDefinition,
+  getTestDefinitionById,
+  importTestDefinition,
+  listTestDefinitionRevisions,
+  listTestDefinitions,
+  updateTestDefinition,
+  updateTestDefinitionContent,
+} from "./handlers/test-definitions.js";
+import {
   cancelTestRun,
   completeTestRun,
   createTestRun,
@@ -76,4 +86,52 @@ app.http("cancel-test-run", {
   authLevel: "anonymous",
   route: "test-runs/{runId}/cancel",
   handler: createHttpHandler(cancelTestRun),
+});
+app.http("list-test-definitions", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "test-definitions",
+  handler: createHttpHandler(listTestDefinitions),
+});
+app.http("create-test-definition", {
+  methods: ["POST"],
+  authLevel: "anonymous",
+  route: "test-definitions",
+  handler: createHttpHandler(createTestDefinition),
+});
+app.http("get-test-definition-by-id", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "test-definitions/{definitionId}",
+  handler: createHttpHandler(getTestDefinitionById),
+});
+app.http("update-test-definition", {
+  methods: ["PUT"],
+  authLevel: "anonymous",
+  route: "test-definitions/{definitionId}",
+  handler: createHttpHandler(updateTestDefinition),
+});
+app.http("delete-test-definition", {
+  methods: ["DELETE"],
+  authLevel: "anonymous",
+  route: "test-definitions/{definitionId}",
+  handler: createHttpHandler(deleteTestDefinition),
+});
+app.http("list-test-definition-revisions", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "test-definitions/{definitionId}/revisions",
+  handler: createHttpHandler(listTestDefinitionRevisions),
+});
+app.http("update-test-definition-content", {
+  methods: ["PUT"],
+  authLevel: "anonymous",
+  route: "test-definitions/{definitionId}/content",
+  handler: createHttpHandler(updateTestDefinitionContent),
+});
+app.http("import-test-definition", {
+  methods: ["POST"],
+  authLevel: "anonymous",
+  route: "test-definitions/import",
+  handler: createHttpHandler(importTestDefinition),
 });

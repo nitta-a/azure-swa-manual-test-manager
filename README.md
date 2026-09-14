@@ -2,7 +2,7 @@
 
 ## English
 
-An MVP for managing manual test runs and their history per pull request, using Markdown in Azure Repos as the source of truth.
+An MVP for managing manual test runs and their history from Azure Repos, GitHub, or App Managed test definitions.
 
 We compared three candidates—`manual-test-manager`, `test-runner-hub`, and `repo-test-board`—and chose `manual-test-manager` because it leaves room for future SCM adapters instead of being tied to Azure DevOps.
 
@@ -13,14 +13,16 @@ We compared three candidates—`manual-test-manager`, `test-runner-hub`, and `re
 - `packages/domain`: Framework-independent types and result evaluation
 - `packages/manifest`: YAML loading and validation for manifest v1
 - `packages/markdown-parser`: Markdown parser for heading and nested-list formats
-- `packages/azure-devops`: Config-injected Azure DevOps REST client
-- `packages/storage`: Repository interfaces, an in-memory implementation, and an Azure Table Storage adapter
+- `packages/source-control`: Provider-neutral pull request and file access contract
+- `packages/azure-devops`: Config-injected Azure DevOps adapter
+- `packages/github`: Config-injected GitHub REST adapter
+- `packages/storage`: TestRun and App Managed revision repositories, an in-memory implementation, and an Azure Table Storage adapter
 
 All packages are private at this stage.
 
 ### Development
 
-Use Node.js 22 and pnpm 10.
+Use Node.js 22 and pnpm 12.
 
 ```sh
 pnpm install
@@ -50,8 +52,16 @@ Only the API reads the following values. The PAT is never sent to the browser.
 | `ADO_PAT` | PAT stored in the API server's Application Settings |
 | `AZURE_STORAGE_CONNECTION_STRING` | Azure Table Storage or Azurite |
 | `MANIFEST_PATH` | Path to the manifest in Repos; defaults to `.manual-test-manifest.yml` |
+| `PROJECT_ID` | Project partition used for App Managed definitions |
+| `GITHUB_OWNER` | GitHub owner or organization; leave unset to disable GitHub |
+| `GITHUB_REPOSITORY` | GitHub repository name; API-only setting |
+| `GITHUB_TOKEN` | GitHub token stored only in API Application Settings |
+| `GITHUB_API_URL` | GitHub API base URL; defaults to `https://api.github.com` |
 | `VITE_PROJECT_ID` | Project ID displayed by the web app |
 | `VITE_REPOSITORY_ID` | Repository ID used when creating a TestRun |
+| `VITE_GITHUB_REPOSITORY` | Repository identifier sent for GitHub source requests |
+
+For GitHub, use a fine-grained token with read-only `Contents` and `Pull requests` access for the configured repository. Azure Repos needs a PAT with Code read access. Neither credential is returned to the browser.
 
 Use separate Static Web Apps and Application Settings for production and preview. Do not commit local secrets.
 
@@ -82,11 +92,13 @@ The implemented core flow is: list PRs → list suites for a PR → select suite
 
 Existing runs do not change when a PR's HEAD is updated. A new run can be created for the same commit. Completed runs are read-only; reopening a run returns it to `inProgress` while preserving its snapshot, and never uses a newer PR HEAD.
 
-Out of scope for the MVP: suite recommendations from changed files, permanent TestCase IDs, long-term analytics, assignees, attachments, AI, PR status / branch policies, Teams notifications, Markdown editing, and a GitHub adapter.
+Test definitions have three sources: Azure Repos, GitHub, and App Managed. Repository runs snapshot the selected PR HEAD commit. App Managed stores structured suites/items in immutable revisions; changing the current definition never changes existing runs. Import copies a repository revision into App Managed and records provenance without synchronization.
+
+Out of scope for the MVP: suite recommendations from changed files, permanent TestCase IDs, long-term analytics, assignees, attachments, AI, PR status / branch policies, Teams notifications, repository write-back, webhooks, bidirectional sync, OAuth login, and rich-text editing.
 
 ## 日本語
 
-Azure Repos の Markdown を正本にして、Pull Request 単位の手動テスト実施と履歴を管理する MVP です。
+Azure Repos、GitHub、App Managed の test definition を正本にして、手動テスト実施と履歴を管理する MVP です。
 
 候補名は `manual-test-manager`、`test-runner-hub`、`repo-test-board` の3案を比較し、Azure DevOps に限定せず将来の別 SCM adapter を追加できる `manual-test-manager` を採用しました。
 
@@ -97,14 +109,16 @@ Azure Repos の Markdown を正本にして、Pull Request 単位の手動テス
 - `packages/domain`: 外部フレームワークに依存しない型と結果判定
 - `packages/manifest`: manifest v1 の YAML 読み込み・検証
 - `packages/markdown-parser`: Heading / 既存ネスト形式の Markdown parser
-- `packages/azure-devops`: 設定注入型の Azure DevOps REST client
-- `packages/storage`: repository interface、インメモリ実装、Azure Table Storage adapter
+- `packages/source-control`: provider-neutral な PR / file access contract
+- `packages/azure-devops`: 設定注入型の Azure DevOps adapter
+- `packages/github`: 設定注入型の GitHub REST adapter
+- `packages/storage`: TestRun と App Managed revision の repository、インメモリ実装、Azure Table Storage adapter
 
 すべての package は開始時点では private です。
 
 ### 開発環境
 
-Node.js 22 系と pnpm 10 を使用します。
+Node.js 22 系と pnpm 12 を使用します。
 
 ```sh
 pnpm install
@@ -134,8 +148,16 @@ API 側だけが次の値を読み込みます。PAT はブラウザへ渡しま
 | `ADO_PAT` | API server の Application Settings に置く PAT |
 | `AZURE_STORAGE_CONNECTION_STRING` | Azure Table Storage または Azurite |
 | `MANIFEST_PATH` | manifest の Repos 上のパス。既定値は `.manual-test-manifest.yml` |
+| `PROJECT_ID` | App Managed definition の project partition |
+| `GITHUB_OWNER` | GitHub owner / organization。未設定なら GitHub を無効化 |
+| `GITHUB_REPOSITORY` | GitHub repository 名。API 側だけで使用 |
+| `GITHUB_TOKEN` | API Application Settings に置く GitHub token |
+| `GITHUB_API_URL` | GitHub API の base URL。既定値は `https://api.github.com` |
 | `VITE_PROJECT_ID` | web が表示する project id |
 | `VITE_REPOSITORY_ID` | TestRun 作成時の repository id |
+| `VITE_GITHUB_REPOSITORY` | GitHub source request に送る repository identifier |
+
+GitHub は対象 repository に対する fine-grained token の read-only `Contents` と `Pull requests` 権限だけを使用します。Azure Repos は Code read 権限の PAT を使用します。どちらの credential もブラウザへ返しません。
 
 Production と preview は別の Static Web Apps / Application Settings とし、local の秘密はコミットしません。
 
@@ -166,4 +188,6 @@ SWA は Standard plan とし、Entra ID の Custom Authentication は対象テ�
 
 PR の HEAD 更新後も既存 Run は変化しません。同じ commit でも新しい Run を作成できます。完了後は read-only、reopen は snapshot を維持したまま inProgress に戻し、PR の HEAD 更新には使いません。
 
-MVP 外: 変更ファイルからの suite 推薦、恒久的 TestCase ID、長期分析、担当者割当、添付、AI、PR status / branch policy、Teams 通知、Markdown 編集、GitHub adapter。
+Test definition の source は Azure Repos、GitHub、App Managed の3種類です。Repository run は PR HEAD commit を snapshot します。App Managed は structured suites/items と immutable revision を保存し、Import は provenance を残しますが同期は行いません。
+
+MVP 外: 変更ファイルからの suite 推薦、恒久的 TestCase ID、長期分析、担当者割当、添付、AI、PR status / branch policy、Teams 通知、repository write-back、webhook、双方向同期、OAuth login、rich-text 編集。

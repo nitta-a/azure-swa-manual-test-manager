@@ -1,10 +1,10 @@
-import { expect, test } from "vitest";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
+import { expect, test } from "vitest";
 import { createTestExecution } from "../src/handlers/executions.js";
 import { createTestRun, getTestRun } from "../src/handlers/test-runs.js";
 import { createHttpHandler, principalUserId } from "../src/http.js";
-import { ServiceError } from "../src/service.js";
 import type { TestRunService } from "../src/service.js";
+import { ServiceError } from "../src/service.js";
 
 type RequestOptions = {
   params?: Record<string, string>;
@@ -33,10 +33,7 @@ test("create-test-run maps the request body and authenticated user", async () =>
     },
   } as unknown as TestRunService;
 
-  const response = await createHttpHandler(
-    createTestRun,
-    Promise.resolve(service),
-  )(
+  const response = await createHttpHandler(createTestRun, Promise.resolve(service))(
     request({
       headers: { "x-user-id": "alice" },
       body: {
@@ -67,10 +64,7 @@ test("create-test-execution uses the route item and If-Match header", async () =
     },
   } as unknown as TestRunService;
 
-  const response = await createHttpHandler(
-    createTestExecution,
-    Promise.resolve(service),
-  )(
+  const response = await createHttpHandler(createTestExecution, Promise.resolve(service))(
     request({
       params: { runId: "run-1", itemId: "route-item" },
       headers: { "if-match": 'W/"1"', "x-user-id": "alice" },
@@ -96,10 +90,7 @@ test("invalid input returns a 400 response", async () => {
     },
   } as unknown as TestRunService;
 
-  const response = await createHttpHandler(
-    createTestRun,
-    Promise.resolve(service),
-  )(
+  const response = await createHttpHandler(createTestRun, Promise.resolve(service))(
     request({
       headers: { "x-request-id": "request-1" },
       body: { repositoryId: "repo", pullRequestId: "not-a-number" },
@@ -125,10 +116,7 @@ test("missing If-Match returns 428 without executing the item", async () => {
     },
   } as unknown as TestRunService;
 
-  const response = await createHttpHandler(
-    createTestExecution,
-    Promise.resolve(service),
-  )(
+  const response = await createHttpHandler(createTestExecution, Promise.resolve(service))(
     request({
       params: { runId: "run-1", itemId: "item-1" },
       body: { itemId: "item-1", status: "passed" },
@@ -137,38 +125,28 @@ test("missing If-Match returns 428 without executing the item", async () => {
   );
 
   expect(response.status).toBe(428);
-  expect((response.jsonBody as { error: string }).error).toBe(
-    "If-Match is required",
-  );
+  expect((response.jsonBody as { error: string }).error).toBe("If-Match is required");
 });
 
 test("resolves the SWA principal and local user fallbacks", () => {
-  const principal = Buffer.from(
-    JSON.stringify({ userId: "principal-id", userDetails: "user@example.com" }),
-  ).toString("base64");
+  const principal = Buffer.from(JSON.stringify({ userId: "principal-id", userDetails: "user@example.com" })).toString(
+    "base64",
+  );
 
-  expect(
-    principalUserId(request({ headers: { "x-ms-client-principal": principal } })),
-  ).toBe("principal-id");
+  expect(principalUserId(request({ headers: { "x-ms-client-principal": principal } }))).toBe("principal-id");
   expect(
     principalUserId(
       request({
         headers: {
-          "x-ms-client-principal": Buffer.from(
-            JSON.stringify({ userDetails: "user@example.com" }),
-          ).toString("base64"),
+          "x-ms-client-principal": Buffer.from(JSON.stringify({ userDetails: "user@example.com" })).toString("base64"),
         },
       }),
     ),
   ).toBe("user@example.com");
-  expect(
-    principalUserId(
-      request({ headers: { "x-ms-client-principal": "not-base64-json" } }),
-    ),
-  ).toBe("authenticated-user");
-  expect(principalUserId(request({ headers: { "x-user-id": "local-id" } }))).toBe(
-    "local-id",
+  expect(principalUserId(request({ headers: { "x-ms-client-principal": "not-base64-json" } }))).toBe(
+    "authenticated-user",
   );
+  expect(principalUserId(request({ headers: { "x-user-id": "local-id" } }))).toBe("local-id");
   expect(principalUserId(request())).toBe("local-user");
 });
 
@@ -178,10 +156,7 @@ test("maps service and unexpected errors to HTTP responses", async () => {
       throw new ServiceError(404, "test run not found");
     },
   } as unknown as TestRunService;
-  const serviceErrorResponse = await createHttpHandler(
-    getTestRun,
-    Promise.resolve(serviceErrorService),
-  )(
+  const serviceErrorResponse = await createHttpHandler(getTestRun, Promise.resolve(serviceErrorService))(
     request({ params: { runId: "missing" }, headers: { "x-request-id": "request-404" } }),
     context(),
   );
@@ -197,13 +172,11 @@ test("maps service and unexpected errors to HTTP responses", async () => {
       throw new Error("database unavailable");
     },
   } as unknown as TestRunService;
-  const unexpectedErrorResponse = await createHttpHandler(
-    getTestRun,
-    Promise.resolve(unexpectedErrorService),
-  )(request({ params: { runId: "run-1" } }), context());
+  const unexpectedErrorResponse = await createHttpHandler(getTestRun, Promise.resolve(unexpectedErrorService))(
+    request({ params: { runId: "run-1" } }),
+    context(),
+  );
 
   expect(unexpectedErrorResponse.status).toBe(500);
-  expect(
-    (unexpectedErrorResponse.jsonBody as { error: string }).error,
-  ).toBe("internal server error");
+  expect((unexpectedErrorResponse.jsonBody as { error: string }).error).toBe("internal server error");
 });

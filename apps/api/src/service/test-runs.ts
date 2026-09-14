@@ -1,63 +1,55 @@
 import { randomUUID } from "node:crypto";
 import { calculateRunResult, hasPendingItems, type TestRun } from "@manual-test-manager/domain";
-import { parseTestMarkdown } from "@manual-test-manager/markdown-parser";
 import type { RepositorySet, Versioned } from "@manual-test-manager/storage";
 import type { StartTestRunInput } from "../service.js";
 import type { ServiceContext } from "./context.js";
 import { ServiceError } from "./errors.js";
-import { getTestDefinition } from "./pull-requests.js";
-
-async function mapLimit<T, R>(values: readonly T[], limit: number, fn: (value: T) => Promise<R>): Promise<R[]> {
-  const output: R[] = [];
-  let next = 0;
-  async function worker() {
-    while (next < values.length) {
-      const index = next++;
-      const value = values[index];
-      if (value !== undefined) output[index] = await fn(value);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, () => worker()));
-  return output;
-}
+import { type DefinitionSource, resolveTestDefinition } from "./resolver.js";
 
 export async function start(context: ServiceContext, input: StartTestRunInput): Promise<Versioned<TestRun>> {
   if (input.suiteIds.length === 0) throw new ServiceError(400, "select at least one suite");
-  const definition = await getTestDefinition(context, input.pullRequestId);
-  const selected = definition.suites.filter((suite) => input.suiteIds.includes(suite.id));
-  if (selected.length !== input.suiteIds.length)
-    throw new ServiceError(400, "one or more suite ids are not in the manifest");
-  const snapshots = await mapLimit(selected, 5, async (suite) => ({
-    suite,
-    markdown: await context.devOps.getFile(suite.path, definition.pullRequest.sourceCommitId),
-  }));
-  const parsed = snapshots.map(({ suite, markdown }) => ({
-    suite,
-    markdown,
-    definition: parseTestMarkdown(markdown),
-  }));
-  const run: TestRun = {
+  const source: DefinitionSource =
+    input.source ||
+    (input.repositoryId !== undefined && input.pullRequestId !== undefined
+      ? { type: "azureRepos", repositoryId: input.repositoryId, pullRequestId: input.pullRequestId }
+      : (() => {
+          throw new ServiceError(400, "source is required");
+        })());
+  const definition = await resolveTestDefinition(context, source, input.suiteIds);
+  const runBase = {
     id: randomUUID(),
-    repositoryId: input.repositoryId,
-    pullRequestId: input.pullRequestId,
-    sourceBranch: definition.pullRequest.sourceBranch,
-    sourceCommitId: definition.pullRequest.sourceCommitId,
-    state: "inProgress",
+    state: "inProgress" as const,
     startedBy: input.startedBy,
     startedAt: context.now(),
   };
+  const run: TestRun =
+    definition.source.type === "appManaged"
+      ? {
+          ...runBase,
+          sourceType: "appManaged",
+          definitionId: definition.source.definitionId,
+          definitionRevisionId: definition.source.revisionId,
+        }
+      : {
+          ...runBase,
+          sourceType: definition.source.type,
+          repositoryId: definition.source.repositoryId,
+          pullRequestId: definition.source.pullRequest.id,
+          sourceBranch: definition.source.pullRequest.sourceBranch,
+          sourceCommitId: definition.source.pullRequest.sourceCommitId,
+        };
   const created = await context.repositories.runs.create(run);
-  for (const { suite, markdown, definition: parsedDefinition } of parsed) {
+  for (const suite of definition.suites) {
     await context.repositories.suites.create({
       runId: run.id,
       suiteId: suite.id,
       title: suite.title,
-      filePath: suite.path,
-      sourceMarkdown: markdown,
+      ...(suite.sourcePath ? { filePath: suite.sourcePath, sourcePath: suite.sourcePath } : {}),
+      ...(suite.sourceContent ? { sourceMarkdown: suite.sourceContent, sourceContent: suite.sourceContent } : {}),
     });
-    for (const item of parsedDefinition.items) {
+    for (const item of suite.items) {
       await context.repositories.items.create({
-        id: randomUUID(),
+        id: item.id || randomUUID(),
         runId: run.id,
         suiteId: suite.id,
         hierarchy: item.hierarchy,
@@ -106,16 +98,10 @@ export async function complete(
 export async function reopen(context: ServiceContext, runId: string): Promise<Versioned<TestRun>> {
   const run = await requireRun(context.repositories, runId);
   if (run.value.state !== "completed") throw new ServiceError(409, "only completed runs can be reopened");
-  const reopened: TestRun = {
-    id: run.value.id,
-    repositoryId: run.value.repositoryId,
-    pullRequestId: run.value.pullRequestId,
-    sourceBranch: run.value.sourceBranch,
-    sourceCommitId: run.value.sourceCommitId,
-    state: "inProgress",
-    startedBy: run.value.startedBy,
-    startedAt: run.value.startedAt,
-  };
+  const reopened: TestRun = { ...run.value, state: "inProgress" };
+  delete reopened.result;
+  delete reopened.completedBy;
+  delete reopened.completedAt;
   return context.repositories.runs.update(reopened);
 }
 

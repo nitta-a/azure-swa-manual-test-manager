@@ -1,13 +1,7 @@
-import { expect, test, vi } from "vitest";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
-import {
-  getTestExecutions,
-} from "../src/handlers/executions.js";
-import {
-  getPullRequest,
-  getTestDefinition,
-  listPullRequests,
-} from "../src/handlers/pull-requests.js";
+import { expect, test, vi } from "vitest";
+import { getTestExecutions } from "../src/handlers/executions.js";
+import { getPullRequest, getTestDefinition, listPullRequests } from "../src/handlers/pull-requests.js";
 import {
   cancelTestRun,
   completeTestRun,
@@ -17,10 +11,7 @@ import {
 } from "../src/handlers/test-runs.js";
 import type { TestRunService } from "../src/service.js";
 
-function request(
-  params: Record<string, string> = {},
-  headers: Record<string, string> = {},
-): HttpRequest {
+function request(params: Record<string, string> = {}, headers: Record<string, string> = {}): HttpRequest {
   return {
     headers: new Headers(headers),
     params,
@@ -50,23 +41,11 @@ test("delegates every read and lifecycle route to the service", async () => {
 
   await listPullRequests(request(), context, service);
   await getPullRequest(request({ pullRequestId: "42" }), context, service);
-  await getTestDefinition(
-    request({ pullRequestId: "42" }),
-    context,
-    service,
-  );
+  await getTestDefinition(request({ pullRequestId: "42" }), context, service);
   await getTestRun(request({ runId: "run-1" }), context, service);
   await getTestRunItems(request({ runId: "run-1" }), context, service);
-  await getTestExecutions(
-    request({ runId: "run-1", itemId: "item-1" }),
-    context,
-    service,
-  );
-  await completeTestRun(
-    request({ runId: "run-1" }, { "x-user-id": "alice" }),
-    context,
-    service,
-  );
+  await getTestExecutions(request({ runId: "run-1", itemId: "item-1" }), context, service);
+  await completeTestRun(request({ runId: "run-1" }, { "x-user-id": "alice" }), context, service);
   await reopenTestRun(request({ runId: "run-1" }), context, service);
   await cancelTestRun(request({ runId: "run-1" }), context, service);
 

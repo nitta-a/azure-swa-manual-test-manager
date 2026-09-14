@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../src/api";
-import { jsonResponse } from "./test-helpers";
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { "content-type": "application/json" },
+  });
+}
 
 const fetchMock = vi.fn();
 
@@ -17,13 +22,18 @@ describe("api client", () => {
   it("requests pull requests and definitions", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ pullRequest: {}, suites: [] }))
       .mockResolvedValueOnce(jsonResponse({ pullRequest: {}, suites: [] }));
 
     await api.listPullRequests();
     await api.getDefinition("42");
+    await api.getDefinition("7", "github", "owner/repository");
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/projects/default/pull-requests");
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/projects/default/pull-requests/42/test-definition");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      "/api/projects/default/pull-requests/7/test-definition?provider=github&repositoryId=owner%2Frepository",
+    );
   });
 
   it("sends a run creation request", async () => {
