@@ -33,3 +33,32 @@ test("treats legacy runs without sourceType as Azure Repos runs", async () => {
     value: { sourceType: "azureRepos" },
   });
 });
+
+test("lists summaries newest first with a cursor", async () => {
+  const repositories = new InMemoryRepositories();
+  for (const [runId, startedAt] of [
+    ["old", "2026-01-01T00:00:00.000Z"],
+    ["new", "2026-01-02T00:00:00.000Z"],
+  ])
+    await repositories.summaries.upsert({
+      runId,
+      projectId: "project",
+      sourceType: "github",
+      state: "inProgress",
+      startedBy: "alice",
+      startedAt,
+      totalCount: 1,
+      pendingCount: 1,
+      passedCount: 0,
+      failedCount: 0,
+      blockedCount: 0,
+      skippedCount: 0,
+    });
+
+  const first = await repositories.summaries.list("project", { limit: 1 });
+  expect(first.items[0]?.value.runId).toBe("new");
+  expect(first.nextCursor).toBeTruthy();
+  await expect(repositories.summaries.list("project", { limit: 1, cursor: first.nextCursor })).resolves.toMatchObject({
+    items: [{ value: { runId: "old" } }],
+  });
+});

@@ -74,6 +74,26 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/test-runs/run-1/complete");
   });
 
+  it("lists runs and sends lifecycle requests", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ items: [] }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    await api.listRuns({ state: "inProgress", limit: 10 });
+    await api.execute("run-1", "item-1", "etag-1", "failed", "HTTP 500");
+    await api.cancel("run-1");
+    await api.reopen("run-1");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/test-runs?state=inProgress&limit=10");
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({ body: JSON.stringify({ itemId: "item-1", status: "failed", comment: "HTTP 500" }) }),
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/test-runs/run-1/cancel");
+    expect(fetchMock.mock.calls[3]?.[0]).toBe("/api/test-runs/run-1/reopen");
+  });
+
   it("throws the API error message for failed responses", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,

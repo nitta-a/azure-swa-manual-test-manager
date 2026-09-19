@@ -17,10 +17,10 @@ afterEach(() => {
 
 describe("application entry point", () => {
   it("mounts the app into the root element", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
 
     await import("../src/main");
 
-    expect(await screen.findByRole("heading", { name: "Pull requests" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Test runs" })).toBeTruthy();
   });
 });

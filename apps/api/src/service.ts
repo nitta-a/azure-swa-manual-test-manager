@@ -1,8 +1,8 @@
 import type { AzureDevOpsClient, PullRequest } from "@manual-test-manager/azure-devops";
-import type { TestExecution, TestRun, TestRunItem, TestStatus } from "@manual-test-manager/domain";
+import type { TestExecution, TestRun, TestRunItem, TestRunSummary, TestStatus } from "@manual-test-manager/domain";
 import type { ManifestV1 } from "@manual-test-manager/manifest";
 import type { SourceControlClient } from "@manual-test-manager/source-control";
-import type { RepositorySet, Versioned } from "@manual-test-manager/storage";
+import type { RepositorySet, TestRunSummaryQuery, Versioned } from "@manual-test-manager/storage";
 import type { ServiceContext } from "./service/context.js";
 import type { DefinitionContent } from "./service/definitions.js";
 import * as definitions from "./service/definitions.js";
@@ -18,6 +18,7 @@ import {
   complete as completeRun,
   get as getRun,
   listItems as listRunItems,
+  list as listRunsFromSummaries,
   reopen as reopenRun,
   start as startRun,
 } from "./service/test-runs.js";
@@ -97,6 +98,10 @@ export class TestRunService {
 
   listItems(runId: string) {
     return listRunItems(this.context, runId);
+  }
+
+  listRuns(query: TestRunSummaryQuery): Promise<{ items: TestRunSummary[]; nextCursor?: string }> {
+    return listRunsFromSummaries(this.context, query);
   }
 
   listExecutions(runId: string, itemId: string) {

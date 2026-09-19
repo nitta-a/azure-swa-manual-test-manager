@@ -62,4 +62,35 @@ describe("test run feature", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/test-runs/run-1/items/item-1/executions", expect.anything()),
     );
   });
+
+  it("requires and sends a comment for failed execution", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          value: { id: "run-1", state: "inProgress", sourceType: "github" },
+          suites: [],
+          items: [
+            {
+              value: { id: "item-1", suiteId: "smoke", hierarchy: [], text: "Can login", status: "pending" },
+              etag: "etag-1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    renderApp("/test-runs/run-1");
+
+    expect(await screen.findByText("Can login")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "failed" }));
+    expect(screen.getByRole("button", { name: "Save failed" })).toHaveProperty("disabled", true);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "HTTP 500" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save failed" }));
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+        expect.objectContaining({ body: JSON.stringify({ itemId: "item-1", status: "failed", comment: "HTTP 500" }) }),
+      ),
+    );
+  });
 });

@@ -17,6 +17,7 @@ import {
   createTestRun,
   getTestRun,
   getTestRunItems,
+  listTestRuns,
   reopenTestRun,
 } from "./handlers/test-runs.js";
 import { createHttpHandler } from "./http.js";
@@ -44,6 +45,12 @@ app.http("create-test-run", {
   authLevel: "anonymous",
   route: "test-runs",
   handler: createHttpHandler(createTestRun),
+});
+app.http("list-test-runs", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "test-runs",
+  handler: createHttpHandler(listTestRuns),
 });
 app.http("get-test-run", {
   methods: ["GET"],

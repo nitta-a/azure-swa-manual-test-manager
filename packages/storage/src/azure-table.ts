@@ -8,6 +8,7 @@ import type {
   TestRun,
   TestRunItem,
   TestRunSuite,
+  TestRunSummary,
 } from "@manual-test-manager/domain";
 import type {
   RepositorySet,
@@ -19,6 +20,8 @@ import type {
   TestRunItemRepository,
   TestRunRepository,
   TestRunSuiteRepository,
+  TestRunSummaryQuery,
+  TestRunSummaryRepository,
   Versioned,
 } from "./index.js";
 import { ETagConflictError } from "./index.js";
@@ -76,6 +79,47 @@ class RunTable implements TestRunRepository {
     await this.table.upsertEntity(entity(run, run.repositoryId || run.definitionId || "app-managed", run.id), "Merge");
     return this.get(run.id) as Promise<Versioned<TestRun>>;
   }
+}
+
+class SummaryTable implements TestRunSummaryRepository {
+  constructor(private readonly table: TableClient) {}
+  async upsert(summary: TestRunSummary) {
+    const rowKey = summaryRowKey(summary);
+    await this.table.upsertEntity(entity(summary, summary.projectId, rowKey), "Replace");
+    return this.get(summary.projectId, rowKey) as Promise<Versioned<TestRunSummary>>;
+  }
+  private async get(projectId: string, rowKey: string) {
+    try {
+      return fromEntity(await this.table.getEntity<Stored<TestRunSummary>>(projectId, rowKey));
+    } catch (error) {
+      if (isNotFound(error)) return undefined;
+      throw error;
+    }
+  }
+  async list(projectId: string, query: TestRunSummaryQuery = {}) {
+    const limit = Math.min(Math.max(query.limit || 20, 1), 100);
+    const filters = [`PartitionKey eq '${projectId.replaceAll("'", "''")}'`];
+    if (query.cursor) filters.push(`RowKey gt '${query.cursor.replaceAll("'", "''")}'`);
+    if (query.state) filters.push(`state eq '${query.state}'`);
+    if (query.result) filters.push(`result eq '${query.result}'`);
+    if (query.sourceType) filters.push(`sourceType eq '${query.sourceType}'`);
+    const items: Array<Versioned<TestRunSummary> & { rowKey: string }> = [];
+    for await (const item of this.table.listEntities<Stored<TestRunSummary>>({
+      queryOptions: { filter: filters.join(" and ") },
+    })) {
+      items.push({ ...fromEntity(item), rowKey: item.rowKey });
+      if (items.length === limit + 1) break;
+    }
+    const next = items.length > limit ? items[limit - 1]?.rowKey : undefined;
+    return {
+      items: items.slice(0, limit).map(({ rowKey: _rowKey, ...item }) => item),
+      ...(next ? { nextCursor: next } : {}),
+    };
+  }
+}
+
+function summaryRowKey(summary: TestRunSummary): string {
+  return `${String(Number.MAX_SAFE_INTEGER - Date.parse(summary.startedAt)).padStart(16, "0")}_${summary.runId}`;
 }
 
 class SuiteTable implements TestRunSuiteRepository {
@@ -304,6 +348,7 @@ export async function createAzureTableRepositories(
   connectionString: string,
   tableNames = {
     runs: "TestRuns",
+    summaries: "TestRunSummaries",
     suites: "TestRunSuites",
     items: "TestRunItems",
     executions: "TestExecutions",
@@ -325,6 +370,7 @@ export async function createAzureTableRepositories(
   );
   return {
     runs: new RunTable(clients.runs),
+    summaries: new SummaryTable(clients.summaries),
     suites: new SuiteTable(clients.suites),
     items: new ItemTable(clients.items),
     executions: new ExecutionTable(clients.executions),

@@ -7,14 +7,20 @@ import {
   completeTestRun,
   getTestRun,
   getTestRunItems,
+  listTestRuns,
   reopenTestRun,
 } from "../src/handlers/test-runs.js";
 import type { TestRunService } from "../src/service.js";
 
-function request(params: Record<string, string> = {}, headers: Record<string, string> = {}): HttpRequest {
+function request(
+  params: Record<string, string> = {},
+  headers: Record<string, string> = {},
+  query = new URLSearchParams(),
+): HttpRequest {
   return {
     headers: new Headers(headers),
     params,
+    query,
   } as unknown as HttpRequest;
 }
 
@@ -26,6 +32,7 @@ test("delegates every read and lifecycle route to the service", async () => {
     getPullRequest: vi.fn(async (id: number) => ({ id })),
     getTestDefinition: vi.fn(async (id: number) => ({ id })),
     get: vi.fn(async (id: string) => ({ id })),
+    listRuns: vi.fn(async (query: unknown) => query),
     listItems: vi.fn(async (id: string) => ({ id })),
     listExecutions: vi.fn(async (runId: string, itemId: string) => ({
       runId,
@@ -43,6 +50,7 @@ test("delegates every read and lifecycle route to the service", async () => {
   await getPullRequest(request({ pullRequestId: "42" }), context, service);
   await getTestDefinition(request({ pullRequestId: "42" }), context, service);
   await getTestRun(request({ runId: "run-1" }), context, service);
+  await listTestRuns(request({}, {}, new URLSearchParams("state=inProgress&limit=10")), context, service);
   await getTestRunItems(request({ runId: "run-1" }), context, service);
   await getTestExecutions(request({ runId: "run-1", itemId: "item-1" }), context, service);
   await completeTestRun(request({ runId: "run-1" }, { "x-user-id": "alice" }), context, service);
@@ -53,6 +61,7 @@ test("delegates every read and lifecycle route to the service", async () => {
   expect(service.getPullRequest).toHaveBeenCalledWith(42);
   expect(service.getTestDefinition).toHaveBeenCalledWith(42);
   expect(service.get).toHaveBeenCalledWith("run-1");
+  expect(service.listRuns).toHaveBeenCalledWith({ state: "inProgress", limit: 10 });
   expect(service.listItems).toHaveBeenCalledWith("run-1");
   expect(service.listExecutions).toHaveBeenCalledWith("run-1", "item-1");
   expect(service.complete).toHaveBeenCalledWith("run-1", "alice");

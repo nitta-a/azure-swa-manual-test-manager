@@ -15,7 +15,7 @@ describe("shared views", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("renders a page title and a link back to pull requests", () => {
+  it("renders a page title and a link back to runs", () => {
     render(
       <MemoryRouter>
         <Page title="Details">content</Page>
@@ -23,7 +23,7 @@ describe("shared views", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Details" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Manual Test Manager" }).getAttribute("href")).toBe("/pull-requests");
+    expect(screen.getByRole("link", { name: "Manual Test Manager" }).getAttribute("href")).toBe("/test-runs");
     expect(screen.getByText("content")).toBeTruthy();
   });
 });

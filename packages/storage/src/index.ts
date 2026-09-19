@@ -7,6 +7,7 @@ import type {
   TestRun,
   TestRunItem,
   TestRunSuite,
+  TestRunSummary,
 } from "@manual-test-manager/domain";
 
 export interface Versioned<T> {
@@ -25,6 +26,23 @@ export interface TestRunRepository {
   create(run: TestRun): Promise<Versioned<TestRun>>;
   get(runId: string): Promise<Versioned<TestRun> | undefined>;
   update(run: TestRun): Promise<Versioned<TestRun>>;
+}
+export interface TestRunSummaryQuery {
+  state?: TestRunSummary["state"];
+  result?: NonNullable<TestRunSummary["result"]>;
+  sourceType?: TestRunSummary["sourceType"];
+  limit?: number;
+  cursor?: string;
+}
+export interface TestRunSummaryRepository {
+  upsert(summary: TestRunSummary): Promise<Versioned<TestRunSummary>>;
+  list(
+    projectId: string,
+    query?: TestRunSummaryQuery,
+  ): Promise<{
+    items: Array<Versioned<TestRunSummary>>;
+    nextCursor?: string;
+  }>;
 }
 export interface TestRunSuiteRepository {
   create(suite: TestRunSuite): Promise<Versioned<TestRunSuite>>;
@@ -62,6 +80,7 @@ export interface TestDefinitionItemRepository {
 }
 export interface RepositorySet {
   runs: TestRunRepository;
+  summaries: TestRunSummaryRepository;
   suites: TestRunSuiteRepository;
   items: TestRunItemRepository;
   executions: TestExecutionRepository;
@@ -79,6 +98,7 @@ function normalizeRun(value: Versioned<TestRun>): Versioned<TestRun> {
 
 export class InMemoryRepositories implements RepositorySet {
   readonly runs = new InMemoryRuns();
+  readonly summaries = new InMemorySummaries();
   readonly suites = new InMemorySuites();
   readonly items = new InMemoryItems();
   readonly executions = new InMemoryExecutions();
@@ -190,6 +210,37 @@ class InMemoryRuns implements TestRunRepository {
     const result = { value: copy(run), etag: crypto.randomUUID() };
     this.values.set(run.id, result);
     return Promise.resolve({ value: copy(result.value), etag: result.etag });
+  }
+}
+
+function summaryRowKey(summary: TestRunSummary): string {
+  return `${String(Number.MAX_SAFE_INTEGER - Date.parse(summary.startedAt)).padStart(16, "0")}_${summary.runId}`;
+}
+
+class InMemorySummaries implements TestRunSummaryRepository {
+  private readonly values = new Map<string, Versioned<TestRunSummary>>();
+  async upsert(summary: TestRunSummary) {
+    const result = { value: copy(summary), etag: crypto.randomUUID() };
+    this.values.set(`${summary.projectId}/${summary.runId}`, result);
+    return { value: copy(result.value), etag: result.etag };
+  }
+  async list(projectId: string, query: TestRunSummaryQuery = {}) {
+    const limit = Math.min(Math.max(query.limit || 20, 1), 100);
+    const values = [...this.values.values()]
+      .filter(({ value }) => value.projectId === projectId)
+      .filter(({ value }) => !query.state || value.state === query.state)
+      .filter(({ value }) => !query.result || value.result === query.result)
+      .filter(({ value }) => !query.sourceType || value.sourceType === query.sourceType)
+      .sort((a, b) => summaryRowKey(a.value).localeCompare(summaryRowKey(b.value)));
+    const cursor = query.cursor;
+    const start = cursor ? values.findIndex((entry) => summaryRowKey(entry.value) > cursor) : 0;
+    const page = values.slice(start < 0 ? values.length : start, (start < 0 ? values.length : start) + limit + 1);
+    const last = page[limit - 1];
+    const next = page.length > limit && last ? summaryRowKey(last.value) : undefined;
+    return {
+      items: page.slice(0, limit).map((entry) => ({ value: copy(entry.value), etag: entry.etag })),
+      ...(next ? { nextCursor: next } : {}),
+    };
   }
 }
 

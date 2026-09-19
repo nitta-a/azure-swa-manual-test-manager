@@ -3,15 +3,17 @@ import { DefinitionsView } from "./features/definitions/DefinitionsView";
 import { PullRequestView } from "./features/pull-request/PullRequestView";
 import { PullRequestsView } from "./features/pull-requests/PullRequestsView";
 import { TestRunView } from "./features/test-run/TestRunView";
+import { TestRunsView } from "./features/test-runs/TestRunsView";
 
 export function App() {
   return (
     <Routes>
+      <Route path="/test-runs" element={<TestRunsView />} />
       <Route path="/pull-requests" element={<PullRequestsView />} />
       <Route path="/pull-requests/:pullRequestId" element={<PullRequestView />} />
       <Route path="/test-runs/:runId" element={<TestRunView />} />
       <Route path="/test-definitions" element={<DefinitionsView />} />
-      <Route path="*" element={<PullRequestsView />} />
+      <Route path="*" element={<TestRunsView />} />
     </Routes>
   );
 }

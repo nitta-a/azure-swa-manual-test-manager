@@ -1,7 +1,7 @@
 import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { expect, test } from "vitest";
 import { createTestExecution } from "../src/handlers/executions.js";
-import { createTestRun, getTestRun } from "../src/handlers/test-runs.js";
+import { createTestRun, getTestRun, listTestRuns } from "../src/handlers/test-runs.js";
 import { createHttpHandler, principalUserId } from "../src/http.js";
 import type { TestRunService } from "../src/service.js";
 import { ServiceError } from "../src/service.js";
@@ -10,12 +10,14 @@ type RequestOptions = {
   params?: Record<string, string>;
   headers?: Record<string, string>;
   body?: unknown;
+  query?: string;
 };
 
 function request(options: RequestOptions = {}): HttpRequest {
   return {
     headers: new Headers(options.headers),
     params: options.params || {},
+    query: new URLSearchParams(options.query),
     json: async () => options.body,
   } as unknown as HttpRequest;
 }
@@ -53,6 +55,24 @@ test("create-test-run maps the request body and authenticated user", async () =>
     startedBy: "alice",
   });
   expect(response.jsonBody).toEqual({ value: { id: "run-1" } });
+});
+
+test("lists test runs with validated query filters", async () => {
+  let received: unknown;
+  const service = {
+    listRuns: async (query: unknown) => {
+      received = query;
+      return { items: [] };
+    },
+  } as unknown as TestRunService;
+
+  const response = await createHttpHandler(listTestRuns, Promise.resolve(service))(
+    request({ query: "state=completed&result=failed&sourceType=github&limit=100&cursor=next" }),
+    context(),
+  );
+
+  expect(response.status).toBe(200);
+  expect(received).toEqual({ state: "completed", result: "failed", sourceType: "github", limit: 100, cursor: "next" });
 });
 
 test("create-test-execution uses the route item and If-Match header", async () => {

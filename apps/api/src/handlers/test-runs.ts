@@ -13,6 +13,24 @@ const startSchema = z.object({
   pullRequestId: z.number().int().positive().optional(),
   suiteIds: z.array(id).min(1),
 });
+const listSchema = z.object({
+  state: z.enum(["inProgress", "completed", "cancelled"]).optional(),
+  result: z.enum(["passed", "failed", "blocked"]).optional(),
+  sourceType: z.enum(["azureRepos", "github", "appManaged"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: id.optional(),
+});
+
+export const listTestRuns: Handler = async (request, _context, service) => {
+  const query = listSchema.parse(Object.fromEntries(request.query.entries()));
+  return service.listRuns({
+    limit: query.limit,
+    ...(query.state ? { state: query.state } : {}),
+    ...(query.result ? { result: query.result } : {}),
+    ...(query.sourceType ? { sourceType: query.sourceType } : {}),
+    ...(query.cursor ? { cursor: query.cursor } : {}),
+  });
+};
 
 export const createTestRun: Handler = async (request, _context, service) => {
   const body = startSchema.parse(await request.json());

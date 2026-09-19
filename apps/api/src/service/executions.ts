@@ -4,7 +4,7 @@ import { ETagConflictError, type Versioned } from "@manual-test-manager/storage"
 import type { ExecutionInput } from "../service.js";
 import type { ServiceContext } from "./context.js";
 import { ServiceError } from "./errors.js";
-import { requireRun } from "./test-runs.js";
+import { requireRun, syncSummary } from "./test-runs.js";
 
 export async function listExecutions(context: ServiceContext, runId: string, itemId: string) {
   await requireRun(context.repositories, runId);
@@ -21,6 +21,8 @@ export async function execute(
 }> {
   const run = await requireRun(context.repositories, runId);
   if (run.value.state !== "inProgress") throw new ServiceError(409, "completed or cancelled runs are read-only");
+  if (["failed", "blocked"].includes(input.status) && !input.comment?.trim())
+    throw new ServiceError(400, "comment is required for failed or blocked execution");
   const current = await context.repositories.items.get(runId, input.itemId);
   if (!current) throw new ServiceError(404, "test item not found");
   const executedAt = context.now();
@@ -48,8 +50,10 @@ export async function execute(
     executedAt,
     ...(input.comment ? { comment: input.comment } : {}),
   };
-  return {
+  const result = {
     item,
     execution: await context.repositories.executions.create(execution),
   };
+  await syncSummary(context, runId);
+  return result;
 }

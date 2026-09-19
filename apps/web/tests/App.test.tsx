@@ -15,11 +15,11 @@ afterEach(() => {
 });
 
 describe("App routes", () => {
-  it("uses the pull request view for the fallback route", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+  it("uses the test runs dashboard for the fallback route", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
 
     renderApp("/unknown");
 
-    expect(await screen.findByRole("heading", { name: "Pull requests" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Test runs" })).toBeTruthy();
   });
 });

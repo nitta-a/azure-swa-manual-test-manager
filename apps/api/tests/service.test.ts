@@ -142,6 +142,39 @@ test("returns a run with its suites and items and records executions", async () 
     comment: "looks good",
   });
   expect(executions).toHaveLength(1);
+  await expect(service.listRuns({ limit: 20 })).resolves.toMatchObject({
+    items: [{ runId: created.value.id, pendingCount: 1, passedCount: 1, failedCount: 0 }],
+  });
+
+  const current = (await service.listItems(created.value.id))[0];
+  if (!current) throw new Error("item fixture is missing");
+  await service.execute(created.value.id, {
+    itemId: current.value.id,
+    status: "failed",
+    executedBy: "bob",
+    expectedEtag: current.etag,
+    comment: "regression found",
+  });
+  await expect(service.listRuns({ limit: 20 })).resolves.toMatchObject({
+    items: [{ pendingCount: 1, passedCount: 0, failedCount: 1 }],
+  });
+});
+
+test("requires comments for failed and blocked executions", async () => {
+  for (const status of ["failed", "blocked"] as const) {
+    const { service } = fixture();
+    const created = await startRun(service);
+    const [item] = await service.listItems(created.value.id);
+    if (!item) throw new Error("item fixture is missing");
+    await expect(
+      service.execute(created.value.id, {
+        itemId: item.value.id,
+        status,
+        executedBy: "alice",
+        expectedEtag: item.etag,
+      }),
+    ).rejects.toMatchObject({ status: 400, message: "comment is required for failed or blocked execution" });
+  }
 });
 
 test("does not complete a run while items are pending", async () => {
@@ -165,6 +198,7 @@ test("calculates a failed result, makes completion read-only, and reopens it", a
       status: index === 0 ? "passed" : "failed",
       executedBy: "alice",
       expectedEtag: item.etag,
+      ...(index === 0 ? {} : { comment: "failure details" }),
     });
   }
   const completed = await service.complete(created.value.id, "alice");
@@ -201,6 +235,7 @@ test("calculates blocked when all executed items are non-failing", async () => {
       status: index === 0 ? "blocked" : "skipped",
       executedBy: "alice",
       expectedEtag: item.etag,
+      ...(index === 0 ? { comment: "blocked by dependency" } : {}),
     });
   }
 
@@ -227,6 +262,7 @@ test("maps stale ETags and missing items to service errors", async () => {
       status: "failed",
       executedBy: "alice",
       expectedEtag: item.etag,
+      comment: "stale attempt",
     }),
   ).rejects.toMatchObject({ status: 409 });
   await expect(

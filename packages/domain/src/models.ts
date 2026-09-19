@@ -20,6 +20,29 @@ export interface TestRun {
   completedAt?: string;
 }
 
+export interface TestRunSummary {
+  runId: string;
+  projectId: string;
+  sourceType: TestRunSourceType;
+  repositoryId?: string;
+  pullRequestId?: number;
+  definitionId?: string;
+  sourceCommitId?: string;
+  definitionRevisionId?: string;
+  state: TestRunState;
+  result?: TestRunResult;
+  startedBy: string;
+  startedAt: string;
+  completedBy?: string;
+  completedAt?: string;
+  totalCount: number;
+  pendingCount: number;
+  passedCount: number;
+  failedCount: number;
+  blockedCount: number;
+  skippedCount: number;
+}
+
 export interface TestRunSuite {
   runId: string;
   suiteId: string;

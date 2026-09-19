@@ -11,7 +11,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed (${response.status})`);
+    const error = new Error(body.error || `Request failed (${response.status})`) as Error & { status: number };
+    error.status = response.status;
+    throw error;
   }
   return response.json() as Promise<T>;
 }
@@ -49,8 +51,32 @@ export interface Item {
     hierarchy: string[];
     text: string;
     status: "pending" | "passed" | "failed" | "blocked" | "skipped";
+    lastExecutedBy?: string;
+    lastExecutedAt?: string;
   };
   etag: string;
+}
+export interface TestRunSummary {
+  runId: string;
+  projectId: string;
+  sourceType: "azureRepos" | "github" | "appManaged";
+  repositoryId?: string;
+  pullRequestId?: number;
+  definitionId?: string;
+  sourceCommitId?: string;
+  definitionRevisionId?: string;
+  state: "inProgress" | "completed" | "cancelled";
+  result?: "passed" | "failed" | "blocked";
+  startedBy: string;
+  startedAt: string;
+  completedBy?: string;
+  completedAt?: string;
+  totalCount: number;
+  pendingCount: number;
+  passedCount: number;
+  failedCount: number;
+  blockedCount: number;
+  skippedCount: number;
 }
 export interface Run {
   value: {
@@ -104,14 +130,28 @@ export const api = {
       ),
     }),
   getRun: (runId: string) => request<Run>(`/test-runs/${runId}`),
-  execute: (runId: string, itemId: string, etag: string, status: string) =>
+  listRuns: (
+    filters: Partial<Pick<TestRunSummary, "state" | "result" | "sourceType">> & {
+      limit?: number;
+      cursor?: string;
+    } = {},
+  ) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) if (value !== undefined) query.set(key, String(value));
+    return request<{ items: TestRunSummary[]; nextCursor?: string }>(
+      `/test-runs${query.toString() ? `?${query}` : ""}`,
+    );
+  },
+  execute: (runId: string, itemId: string, etag: string, status: string, comment?: string) =>
     request(`/test-runs/${runId}/items/${itemId}/executions`, {
       method: "POST",
       headers: { "if-match": etag },
-      body: JSON.stringify({ itemId, status }),
+      body: JSON.stringify({ itemId, status, ...(comment ? { comment } : {}) }),
     }),
   executions: (runId: string, itemId: string) => request<Execution[]>(`/test-runs/${runId}/items/${itemId}/executions`),
   complete: (runId: string) => request(`/test-runs/${runId}/complete`, { method: "POST" }),
+  cancel: (runId: string) => request(`/test-runs/${runId}/cancel`, { method: "POST" }),
+  reopen: (runId: string) => request(`/test-runs/${runId}/reopen`, { method: "POST" }),
   listTestDefinitions: () => request<Array<{ value: ManagedDefinition["value"]; etag: string }>>("/test-definitions"),
   getTestDefinitionById: (id: string) => request<ManagedDefinition>(`/test-definitions/${id}`),
   createTestDefinition: (

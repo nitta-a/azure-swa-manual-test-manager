@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { calculateRunResult, hasPendingItems, type TestRun } from "@manual-test-manager/domain";
-import type { RepositorySet, Versioned } from "@manual-test-manager/storage";
+import {
+  calculateRunProgress,
+  calculateRunResult,
+  hasPendingItems,
+  type TestRun,
+  type TestRunSummary,
+} from "@manual-test-manager/domain";
+import type { RepositorySet, TestRunSummaryQuery, Versioned } from "@manual-test-manager/storage";
 import type { StartTestRunInput } from "../service.js";
 import type { ServiceContext } from "./context.js";
 import { ServiceError } from "./errors.js";
@@ -58,6 +64,7 @@ export async function start(context: ServiceContext, input: StartTestRunInput): 
       });
     }
   }
+  await syncSummary(context, run.id);
   return created;
 }
 
@@ -76,6 +83,43 @@ export async function listItems(context: ServiceContext, runId: string) {
   return context.repositories.items.listByRun(runId);
 }
 
+export async function list(context: ServiceContext, query: TestRunSummaryQuery) {
+  const page = await context.repositories.summaries.list(context.projectId, query);
+  return {
+    items: page.items.map((entry) => entry.value),
+    ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
+  };
+}
+
+export async function syncSummary(context: ServiceContext, runId: string): Promise<Versioned<TestRunSummary>> {
+  const run = await requireRun(context.repositories, runId);
+  const items = await context.repositories.items.listByRun(runId);
+  const progress = calculateRunProgress(items.map((item) => item.value));
+  const value: TestRunSummary = {
+    runId,
+    projectId: context.projectId,
+    sourceType: run.value.sourceType || "azureRepos",
+    state: run.value.state,
+    startedBy: run.value.startedBy,
+    startedAt: run.value.startedAt,
+    totalCount: progress.total,
+    pendingCount: progress.pending,
+    passedCount: progress.passed,
+    failedCount: progress.failed,
+    blockedCount: progress.blocked,
+    skippedCount: progress.skipped,
+    ...(run.value.repositoryId ? { repositoryId: run.value.repositoryId } : {}),
+    ...(run.value.pullRequestId !== undefined ? { pullRequestId: run.value.pullRequestId } : {}),
+    ...(run.value.definitionId ? { definitionId: run.value.definitionId } : {}),
+    ...(run.value.sourceCommitId ? { sourceCommitId: run.value.sourceCommitId } : {}),
+    ...(run.value.definitionRevisionId ? { definitionRevisionId: run.value.definitionRevisionId } : {}),
+    ...(run.value.result ? { result: run.value.result } : {}),
+    ...(run.value.completedBy ? { completedBy: run.value.completedBy } : {}),
+    ...(run.value.completedAt ? { completedAt: run.value.completedAt } : {}),
+  };
+  return context.repositories.summaries.upsert(value);
+}
+
 export async function complete(
   context: ServiceContext,
   runId: string,
@@ -86,13 +130,15 @@ export async function complete(
   const items = await context.repositories.items.listByRun(runId);
   if (hasPendingItems(items.map((item) => item.value.status)))
     throw new ServiceError(409, "all items must be executed before completion");
-  return context.repositories.runs.update({
+  const updated = await context.repositories.runs.update({
     ...run.value,
     state: "completed",
     result: calculateRunResult(items.map((item) => item.value.status)),
     completedBy,
     completedAt: context.now(),
   });
+  await syncSummary(context, runId);
+  return updated;
 }
 
 export async function reopen(context: ServiceContext, runId: string): Promise<Versioned<TestRun>> {
@@ -102,17 +148,21 @@ export async function reopen(context: ServiceContext, runId: string): Promise<Ve
   delete reopened.result;
   delete reopened.completedBy;
   delete reopened.completedAt;
-  return context.repositories.runs.update(reopened);
+  const updated = await context.repositories.runs.update(reopened);
+  await syncSummary(context, runId);
+  return updated;
 }
 
 export async function cancel(context: ServiceContext, runId: string): Promise<Versioned<TestRun>> {
   const run = await requireRun(context.repositories, runId);
   if (run.value.state !== "inProgress") throw new ServiceError(409, "only in-progress runs can be cancelled");
-  return context.repositories.runs.update({
+  const updated = await context.repositories.runs.update({
     ...run.value,
     state: "cancelled",
     completedAt: context.now(),
   });
+  await syncSummary(context, runId);
+  return updated;
 }
 
 export async function requireRun(repositories: RepositorySet, runId: string): Promise<Versioned<TestRun>> {
