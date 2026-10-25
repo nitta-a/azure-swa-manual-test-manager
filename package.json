@@ -6,6 +6,7 @@
     "node": ">=22 <25"
   },
   "scripts": {
+    "dev": "pnpm --filter @manual-test-manager/web dev",
     "build": "pnpm run build:packages && pnpm --filter @manual-test-manager/api build && pnpm --filter @manual-test-manager/web build",
     "build:packages": "pnpm --filter @manual-test-manager/domain build && pnpm --filter @manual-test-manager/manifest build && pnpm --filter @manual-test-manager/markdown-parser build && pnpm --filter @manual-test-manager/source-control build && pnpm --filter @manual-test-manager/azure-devops build && pnpm --filter @manual-test-manager/github build && pnpm --filter @manual-test-manager/storage build",
     "typecheck": "pnpm run build:packages && pnpm --filter @manual-test-manager/api typecheck && pnpm --filter @manual-test-manager/web typecheck",

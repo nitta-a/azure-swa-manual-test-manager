@@ -35,10 +35,11 @@ Only explicit local development (`AZURE_FUNCTIONS_ENVIRONMENT=Development` or `N
 
 ```sh
 cp apps/api/local.settings.example.json apps/api/local.settings.json
+./scripts/create-local-tables.sh
 pnpm --filter @manual-test-manager/web dev
 ```
 
-Start Azurite when using `AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true`. `VITE_PROJECT_ID` and `VITE_REPOSITORY_ID` are used by the web app's API requests.
+The table setup script requires Azure CLI (`az`) and creates the tables used by the API. Start Azurite first when using `AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true`. `VITE_PROJECT_ID` and `VITE_REPOSITORY_ID` are used by the web app's API requests.
 
 ### Environment variables
 
@@ -133,10 +134,11 @@ pnpm test
 
 ```sh
 cp apps/api/local.settings.example.json apps/api/local.settings.json
+./scripts/create-local-tables.sh
 pnpm --filter @manual-test-manager/web dev
 ```
 
-`AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true` を使用する場合は Azurite を起動してください。`VITE_PROJECT_ID` と `VITE_REPOSITORY_ID` は web の API リクエストに使います。
+テーブル作成スクリプトには Azure CLI（`az`）が必要です。API が使うテーブルを作成します。`AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true` の場合は、先に Azurite を起動してください。`VITE_PROJECT_ID` と `VITE_REPOSITORY_ID` は web の API リクエストに使います。
 
 ### 環境変数
 
