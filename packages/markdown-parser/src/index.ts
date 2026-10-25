@@ -37,10 +37,11 @@ export function parseTestMarkdown(markdown: string): ParsedTestDefinition {
       const level = heading[1]?.length ?? 2;
       while (headings.at(-1) && (headings.at(-1)?.level ?? 0) >= level) headings.pop();
       headings.push({ level, text });
+      listHeadings.length = 0;
       continue;
     }
 
-    const bullet = /^(\s*)[-*+]\s+(.*)$/.exec(line);
+    const bullet = /^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$/.exec(line);
     if (!bullet) continue;
     const indent = bullet[1]?.replace(/\t/g, "    ").length ?? 0;
     const body = bullet[2] ?? "";
@@ -50,8 +51,8 @@ export function parseTestMarkdown(markdown: string): ParsedTestDefinition {
       const marker = checkbox[1] ?? "";
       const text = checkbox[2]?.trim() ?? "";
       if (!/^[ xX]$/.test(marker) || !text) throw new MarkdownParseError(`invalid checkbox item at line ${lineNumber}`);
-      const hierarchy =
-        headings.length > 0 ? headings.map((entry) => entry.text) : listHeadings.map((entry) => entry.text);
+      while (listHeadings.at(-1) && (listHeadings.at(-1)?.indent ?? 0) >= indent) listHeadings.pop();
+      const hierarchy = [...headings.map((entry) => entry.text), ...listHeadings.map((entry) => entry.text)];
       items.push({ hierarchy, text });
       continue;
     }

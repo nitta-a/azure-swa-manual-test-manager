@@ -42,6 +42,10 @@ test("create-test-run maps the request body and authenticated user", async () =>
         repositoryId: "repo",
         pullRequestId: 12,
         suiteIds: ["smoke"],
+        itemIds: ["smoke:2"],
+        releaseName: "v2",
+        environmentUrl: "https://example.test",
+        browser: "Chrome",
       },
     }),
     context(),
@@ -52,6 +56,10 @@ test("create-test-run maps the request body and authenticated user", async () =>
     repositoryId: "repo",
     pullRequestId: 12,
     suiteIds: ["smoke"],
+    itemIds: ["smoke:2"],
+    releaseName: "v2",
+    environmentUrl: "https://example.test",
+    browser: "Chrome",
     startedBy: "alice",
   });
   expect(response.jsonBody).toEqual({ value: { id: "run-1" } });
@@ -88,7 +96,13 @@ test("create-test-execution uses the route item and If-Match header", async () =
     request({
       params: { runId: "run-1", itemId: "route-item" },
       headers: { "if-match": 'W/"1"', "x-user-id": "alice" },
-      body: { itemId: "body-item", status: "passed", comment: "done" },
+      body: {
+        itemId: "body-item",
+        status: "passed",
+        comment: "done",
+        evidenceUrl: "https://example.test/evidence.png",
+        issueTicketUrl: "https://example.test/issues/42",
+      },
     }),
     context(),
   );
@@ -98,6 +112,8 @@ test("create-test-execution uses the route item and If-Match header", async () =
     itemId: "route-item",
     status: "passed",
     comment: "done",
+    evidenceUrl: "https://example.test/evidence.png",
+    issueTicketUrl: "https://example.test/issues/42",
     executedBy: "alice",
     expectedEtag: 'W/"1"',
   });

@@ -26,7 +26,15 @@ describe("pull request feature", () => {
             targetBranch: "refs/heads/main",
             sourceCommitId: "commit-1",
           },
-          suites: [{ id: "smoke", title: "Smoke", path: "smoke.md" }],
+          suites: [
+            {
+              id: "smoke",
+              title: "Smoke",
+              path: "smoke.md",
+              sourceMarkdown: "## Login\n- [ ] Can login",
+              items: [{ id: "smoke:0", hierarchy: ["Login"], text: "Can login", order: 0 }],
+            },
+          ],
         }),
       )
       .mockResolvedValueOnce(jsonResponse({ value: { id: "run-1" } }))
@@ -44,11 +52,11 @@ describe("pull request feature", () => {
 
     renderApp("/pull-requests/42");
 
-    const checkbox = await screen.findByRole("checkbox");
+    const checkboxes = await screen.findAllByRole("checkbox");
     const startButton = screen.getByRole("button", { name: "テスト開始" });
     expect((startButton as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.click(checkbox);
+    fireEvent.click(checkboxes[0] as HTMLInputElement);
     expect((startButton as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(startButton);
 

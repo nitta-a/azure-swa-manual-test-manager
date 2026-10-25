@@ -54,6 +54,29 @@ describe("api client", () => {
     );
   });
 
+  it("sends item scope and run environment metadata", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ value: { id: "run-1" } }));
+
+    await api.startRun({ type: "azureRepos", repositoryId: "repo", pullRequestId: 42 }, ["smoke"], ["smoke:1"], {
+      releaseName: "v2",
+      environmentUrl: "https://example.test",
+      browser: "Firefox",
+    });
+
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        body: JSON.stringify({
+          source: { type: "azureRepos", repositoryId: "repo", pullRequestId: 42 },
+          suiteIds: ["smoke"],
+          itemIds: ["smoke:1"],
+          releaseName: "v2",
+          environmentUrl: "https://example.test",
+          browser: "Firefox",
+        }),
+      }),
+    );
+  });
+
   it("sends execution and completion requests", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({}))
@@ -72,6 +95,26 @@ describe("api client", () => {
     );
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/test-runs/run-1/items/item-1/executions");
     expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/test-runs/run-1/complete");
+  });
+
+  it("sends evidence and issue URLs with an execution", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}));
+
+    await api.execute("run-1", "item-1", "etag-1", "passed", {
+      evidenceUrl: "https://example.test/evidence.png",
+      issueTicketUrl: "https://example.test/issues/42",
+    });
+
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        body: JSON.stringify({
+          itemId: "item-1",
+          status: "passed",
+          evidenceUrl: "https://example.test/evidence.png",
+          issueTicketUrl: "https://example.test/issues/42",
+        }),
+      }),
+    );
   });
 
   it("lists runs and sends lifecycle requests", async () => {

@@ -12,6 +12,18 @@ const startSchema = z.object({
   repositoryId: id.optional(),
   pullRequestId: z.number().int().positive().optional(),
   suiteIds: z.array(id).min(1),
+  itemIds: z.array(id).optional(),
+  releaseName: z.string().trim().optional(),
+  environmentUrl: z.string().url().optional(),
+  makerVersion: z.string().trim().optional(),
+  viewerVersion: z.string().trim().optional(),
+  functionsVersion: z.string().trim().optional(),
+  appVersionBefore: z.string().trim().optional(),
+  appVersionAfter: z.string().trim().optional(),
+  browser: z.string().trim().optional(),
+  operatingSystem: z.string().trim().optional(),
+  locale: z.string().trim().optional(),
+  featureConfiguration: z.string().optional(),
 });
 const listSchema = z.object({
   state: z.enum(["inProgress", "completed", "cancelled"]).optional(),
@@ -34,7 +46,37 @@ export const listTestRuns: Handler = async (request, _context, service) => {
 
 export const createTestRun: Handler = async (request, _context, service) => {
   const body = startSchema.parse(await request.json());
-  const input = { suiteIds: body.suiteIds, startedBy: principalUserId(request) };
+  const {
+    suiteIds,
+    itemIds,
+    releaseName,
+    environmentUrl,
+    makerVersion,
+    viewerVersion,
+    functionsVersion,
+    appVersionBefore,
+    appVersionAfter,
+    browser,
+    operatingSystem,
+    locale,
+    featureConfiguration,
+  } = body;
+  const input = {
+    suiteIds,
+    startedBy: principalUserId(request),
+    ...(itemIds ? { itemIds } : {}),
+    ...(releaseName ? { releaseName } : {}),
+    ...(environmentUrl ? { environmentUrl } : {}),
+    ...(makerVersion ? { makerVersion } : {}),
+    ...(viewerVersion ? { viewerVersion } : {}),
+    ...(functionsVersion ? { functionsVersion } : {}),
+    ...(appVersionBefore ? { appVersionBefore } : {}),
+    ...(appVersionAfter ? { appVersionAfter } : {}),
+    ...(browser ? { browser } : {}),
+    ...(operatingSystem ? { operatingSystem } : {}),
+    ...(locale ? { locale } : {}),
+    ...(featureConfiguration ? { featureConfiguration } : {}),
+  };
   if (body.source) return service.start({ ...input, source: body.source });
   return service.start({
     ...input,

@@ -33,7 +33,19 @@ export interface StartTestRunInput {
   repositoryId?: string;
   pullRequestId?: number;
   suiteIds: string[];
+  itemIds?: string[];
   startedBy: string;
+  releaseName?: string;
+  environmentUrl?: string;
+  makerVersion?: string;
+  viewerVersion?: string;
+  functionsVersion?: string;
+  appVersionBefore?: string;
+  appVersionAfter?: string;
+  browser?: string;
+  operatingSystem?: string;
+  locale?: string;
+  featureConfiguration?: string;
 }
 
 export interface ExecutionInput {
@@ -41,6 +53,8 @@ export interface ExecutionInput {
   status: Exclude<TestStatus, "pending">;
   executedBy: string;
   comment?: string;
+  evidenceUrl?: string;
+  issueTicketUrl?: string;
   expectedEtag: string;
 }
 

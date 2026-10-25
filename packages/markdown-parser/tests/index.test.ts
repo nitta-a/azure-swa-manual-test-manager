@@ -13,6 +13,20 @@ test("keeps heading hierarchy", () => {
   });
 });
 
+test("keeps nested parent conditions under headings and preserves source item order", () => {
+  expect(
+    parseTestMarkdown(
+      "## Checkout\n- Payment available\n  1. Card enabled\n     - [ ] card payment\n  2. [ ] cash payment\n- [ ] cancel order",
+    ),
+  ).toEqual({
+    items: [
+      { hierarchy: ["Checkout", "Payment available", "Card enabled"], text: "card payment" },
+      { hierarchy: ["Checkout", "Payment available"], text: "cash payment" },
+      { hierarchy: ["Checkout"], text: "cancel order" },
+    ],
+  });
+});
+
 test("ignores prose, links, and blockquotes", () => {
   expect(parseTestMarkdown("説明\n> - [ ] 引用ではない\n- [link](https://example.com)")).toEqual({ items: [] });
 });

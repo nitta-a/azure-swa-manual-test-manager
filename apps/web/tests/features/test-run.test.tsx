@@ -84,12 +84,52 @@ describe("test run feature", () => {
     expect(await screen.findByText("Can login")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "failed" }));
     expect(screen.getByRole("button", { name: "Save failed" })).toHaveProperty("disabled", true);
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "HTTP 500" } });
+    fireEvent.change(screen.getByLabelText("実施メモ（必須）"), { target: { value: "HTTP 500" } });
     fireEvent.click(screen.getByRole("button", { name: "Save failed" }));
 
     await waitFor(() =>
       expect(fetchMock.mock.calls[1]?.[1]).toEqual(
         expect.objectContaining({ body: JSON.stringify({ itemId: "item-1", status: "failed", comment: "HTTP 500" }) }),
+      ),
+    );
+  });
+
+  it("allows evidence to be attached to a passing result", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          value: { id: "run-1", state: "inProgress" },
+          suites: [],
+          items: [
+            {
+              value: { id: "item-1", suiteId: "smoke", hierarchy: [], text: "Can login", status: "pending" },
+              etag: "etag-1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    renderApp("/test-runs/run-1");
+
+    expect(await screen.findByText("Can login")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "passed" }));
+    fireEvent.change(screen.getByLabelText("証跡 URL"), { target: { value: "https://example.test/evidence.png" } });
+    fireEvent.change(screen.getByLabelText("障害チケット URL"), {
+      target: { value: "https://example.test/issues/42" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save passed" }));
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+        expect.objectContaining({
+          body: JSON.stringify({
+            itemId: "item-1",
+            status: "passed",
+            evidenceUrl: "https://example.test/evidence.png",
+            issueTicketUrl: "https://example.test/issues/42",
+          }),
+        }),
       ),
     );
   });

@@ -1,9 +1,11 @@
 import { ErrorMessage } from "../shared/ErrorMessage";
 import { Page } from "../shared/Page";
+import { RunMetadataFields } from "../shared/RunMetadataFields";
 import { usePullRequest } from "./usePullRequest";
 
 export function PullRequestView() {
-  const { definition, selected, startRun, toggleSuite } = usePullRequest();
+  const { definition, selectedItemIds, startRun, toggleSuite, toggleItem, toggleItems, details, setDetail } =
+    usePullRequest();
   const title = definition.data
     ? `#${definition.data.pullRequest.id} ${definition.data.pullRequest.title}`
     : "PR details";
@@ -22,20 +24,57 @@ export function PullRequestView() {
             <fieldset>
               <legend>実施するSuiteを選択</legend>
               {definition.data.suites.map((suite) => (
-                <label className="check" key={suite.id}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(suite.id)}
-                    onChange={(event) => toggleSuite(suite.id, event.target.checked)}
-                  />
-                  {suite.title}
-                  <small>{suite.path}</small>
-                </label>
+                <div className="suite-selection" key={suite.id}>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={suite.items.length > 0 && suite.items.every((item) => selectedItemIds.includes(item.id))}
+                      onChange={(event) => toggleSuite(suite.id, event.target.checked)}
+                    />
+                    {suite.title}
+                    <small>{suite.path}</small>
+                  </label>
+                  <details className="source-preview">
+                    <summary>原文 Markdown を参照</summary>
+                    <pre>{suite.sourceMarkdown}</pre>
+                  </details>
+                  {groupByChapter(suite.items).map((group) => (
+                    <div className="chapter" key={group.items[0]?.id || group.title}>
+                      {group.title && (
+                        <label className="check">
+                          <input
+                            type="checkbox"
+                            checked={group.items.every((item) => selectedItemIds.includes(item.id))}
+                            onChange={(event) =>
+                              toggleItems(
+                                group.items.map((item) => item.id),
+                                event.target.checked,
+                              )
+                            }
+                          />
+                          {group.title}
+                        </label>
+                      )}
+                      {group.items.map((item) => (
+                        <label className="check" key={item.id}>
+                          <input
+                            type="checkbox"
+                            checked={selectedItemIds.includes(item.id)}
+                            onChange={(event) => toggleItem(item.id, event.target.checked)}
+                          />
+                          {item.hierarchy.length > 1 ? `${item.hierarchy.slice(1).join(" / ")} / ` : ""}
+                          {item.text}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               ))}
             </fieldset>
+            <RunMetadataFields details={details} onChange={setDetail} />
             <button
               type="button"
-              disabled={selected.length === 0 || startRun.isPending}
+              disabled={selectedItemIds.length === 0 || startRun.isPending}
               onClick={() => startRun.mutate()}
             >
               テスト開始
@@ -45,4 +84,15 @@ export function PullRequestView() {
       )}
     </Page>
   );
+}
+
+function groupByChapter<T extends { id: string; hierarchy: string[] }>(items: T[]) {
+  const groups: Array<{ title: string; items: T[] }> = [];
+  for (const item of items) {
+    const title = item.hierarchy[0] || "";
+    const last = groups.at(-1);
+    if (last?.title === title) last.items.push(item);
+    else groups.push({ title, items: [item] });
+  }
+  return groups;
 }
