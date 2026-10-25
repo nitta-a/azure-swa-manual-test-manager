@@ -9,10 +9,13 @@ export function PullRequestView() {
     usePullRequest();
   const title = definition.data
     ? `#${definition.data.pullRequest.id} ${definition.data.pullRequest.title}`
-    : "PR details";
+    : "プルリクエストの詳細";
 
   return (
-    <Page title={title}>
+    <Page
+      title={title}
+      description="テストするスイートや項目を選択し、必要な実行環境情報を入力してテストを開始します。チェックボックスはスイート・章単位でも切り替えられます。"
+    >
       <ErrorMessage error={definition.error || startRun.error} />
       {definition.isPending ? (
         <p>読み込み中…</p>
@@ -20,10 +23,10 @@ export function PullRequestView() {
         definition.data && (
           <>
             <p>
-              commit: <code>{definition.data.pullRequest.sourceCommitId}</code>
+              変更コミット: <code>{definition.data.pullRequest.sourceCommitId}</code>
             </p>
             <fieldset>
-              <legend>実施するSuiteを選択</legend>
+              <legend>実施するスイートを選択</legend>
               {definition.data.suites.map((suite) => (
                 <div className="suite-selection" key={suite.id}>
                   <label className="check">
@@ -36,7 +39,7 @@ export function PullRequestView() {
                     <small>{suite.path}</small>
                   </label>
                   <details className="source-preview">
-                    <summary>原文 Markdown を参照</summary>
+                    <summary>元のテスト定義（Markdown）を確認</summary>
                     <pre>{suite.sourceMarkdown}</pre>
                   </details>
                   {groupByChapter(suite.items, (item) => item.hierarchy).map((group) => (
@@ -78,7 +81,7 @@ export function PullRequestView() {
               disabled={selectedItemIds.length === 0 || startRun.isPending}
               onClick={() => startRun.mutate()}
             >
-              テスト開始
+              選択した項目でテストを開始
             </button>
           </>
         )

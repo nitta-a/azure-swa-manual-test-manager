@@ -64,12 +64,12 @@ export function TestRunView() {
       (item) => item.value.inScope !== false && item.value.status === "skipped",
     );
     const lines = [
-      `## Manual test run: ${run.data.value.result || run.data.value.state}`,
+      `## 手動テスト結果: ${run.data.value.result ? statusLabel(run.data.value.result) : stateLabel(run.data.value.state)}`,
       "",
-      `Run: ${runUrl}`,
-      `Release: ${run.data.value.releaseName || "not specified"}`,
-      `Environment: ${run.data.value.environmentUrl || "not specified"}`,
-      `Definition: ${run.data.value.sourceCommitId || run.data.value.definitionRevisionId || "not specified"}`,
+      `実行: ${runUrl}`,
+      `リリース: ${run.data.value.releaseName || "未設定"}`,
+      `環境: ${run.data.value.environmentUrl || "未設定"}`,
+      `定義: ${run.data.value.sourceCommitId || run.data.value.definitionRevisionId || "未設定"}`,
       ...(
         [
           "makerVersion",
@@ -82,25 +82,25 @@ export function TestRunView() {
           "locale",
           "featureConfiguration",
         ] as const
-      ).map((key) => `${key}: ${run.data?.value[key] || "not specified"}`),
-      `Results: ${progress.passed} passed, ${progress.failed} failed, ${progress.blocked} blocked, ${progress.skipped} skipped, ${progress.pending} pending`,
-      `Out of scope: ${run.data.items.filter((item) => item.value.inScope === false).length}`,
+      ).map((key) => `${key}: ${run.data?.value[key] || "未設定"}`),
+      `結果: 合格 ${progress.passed} 件、不合格 ${progress.failed} 件、ブロック ${progress.blocked} 件、スキップ ${progress.skipped} 件、未実施 ${progress.pending} 件`,
+      `対象外: ${run.data.items.filter((item) => item.value.inScope === false).length} 件`,
       "",
-      "### Unresolved failures",
+      "### 未解決の不合格・ブロック",
       ...(failedItems.length
         ? failedItems.map(
             (item) =>
-              `- ${item.value.hierarchy.join(" / ")} ${item.value.text}: ${item.value.lastComment || "No details"}${item.value.lastIssueTicketUrl ? ` ([ticket](${item.value.lastIssueTicketUrl}))` : ""}`,
+              `- ${item.value.hierarchy.join(" / ")} ${item.value.text}: ${item.value.lastComment || "詳細なし"}${item.value.lastIssueTicketUrl ? ` ([障害チケット](${item.value.lastIssueTicketUrl}))` : ""}`,
           )
-        : ["- None"]),
+        : ["- なし"]),
       "",
-      "### Skipped items",
+      "### スキップした項目",
       ...(skippedItems.length
         ? skippedItems.map(
             (item) =>
-              `- ${item.value.hierarchy.join(" / ")} ${item.value.text}: ${item.value.lastComment || "No reason recorded"}`,
+              `- ${item.value.hierarchy.join(" / ")} ${item.value.text}: ${item.value.lastComment || "理由の記録なし"}`,
           )
-        : ["- None"]),
+        : ["- なし"]),
     ];
     try {
       navigator.clipboard.writeText(lines.join("\n")).then(
@@ -114,7 +114,10 @@ export function TestRunView() {
   }
 
   return (
-    <Page title="Test run">
+    <Page
+      title="テスト実行の詳細"
+      description="各項目を実際に確認し、合格・不合格・ブロック・スキップを記録します。不合格・ブロック・スキップには理由を入力してください。証跡や障害チケットのURLも残せます。"
+    >
       <ErrorMessage error={error} />
       {conflict && (
         <p role="status" className="error">
@@ -130,8 +133,8 @@ export function TestRunView() {
         run.data && (
           <>
             <p>
-              状態: <strong>{run.data.value.state}</strong> {run.data.value.result ? `(${run.data.value.result})` : ""}{" "}
-              · テスト定義の版:{" "}
+              状態: <strong>{stateLabel(run.data.value.state)}</strong>{" "}
+              {run.data.value.result ? `（${statusLabel(run.data.value.result)}）` : ""} · テスト定義の版:{" "}
               <code>
                 {run.data.value.sourceCommitId || run.data.value.definitionRevisionId || run.data.value.sourceType}
               </code>
@@ -141,9 +144,9 @@ export function TestRunView() {
                 [
                   ["リリース", run.data.value.releaseName],
                   ["環境", run.data.value.environmentUrl],
-                  ["Maker", run.data.value.makerVersion],
-                  ["Viewer", run.data.value.viewerVersion],
-                  ["Functions", run.data.value.functionsVersion],
+                  ["Maker 版", run.data.value.makerVersion],
+                  ["Viewer 版", run.data.value.viewerVersion],
+                  ["Functions 版", run.data.value.functionsVersion],
                   ["アプリ版（変更前）", run.data.value.appVersionBefore],
                   ["アプリ版（変更後）", run.data.value.appVersionAfter],
                   ["ブラウザ", run.data.value.browser],
@@ -163,9 +166,9 @@ export function TestRunView() {
             {run.data.suites.map((suite) =>
               suite.value.sourceMarkdown ? (
                 <details className="source-preview" key={suite.value.suiteId}>
-                  <summary>{suite.value.title} — 原文 Markdown</summary>
+                  <summary>{suite.value.title} — 元の Markdown を確認</summary>
                   {markdownLinks(suite.value.sourceMarkdown, suite.value.sourceUrl).length > 0 && (
-                    <ul aria-label={`${suite.value.title} links`}>
+                    <ul aria-label={`${suite.value.title} のリンク`}>
                       {markdownLinks(suite.value.sourceMarkdown, suite.value.sourceUrl).map((link) => (
                         <li key={link.url}>
                           <a href={link.url} target="_blank" rel="noreferrer">
@@ -179,10 +182,10 @@ export function TestRunView() {
                 </details>
               ) : null,
             )}
-            <section className="progress" aria-label="Run progress">
+            <section className="progress" aria-label="テスト実行の進捗">
               <strong>
                 {progress.passed + progress.failed + progress.blocked + progress.skipped} /{" "}
-                {progress.pending + progress.passed + progress.failed + progress.blocked + progress.skipped} completed
+                {progress.pending + progress.passed + progress.failed + progress.blocked + progress.skipped} 件完了
               </strong>
               <div className="progress-bar" aria-hidden="true">
                 <span
@@ -208,7 +211,7 @@ export function TestRunView() {
                   className={filter === "all" ? "selected" : "quiet"}
                   onClick={() => setFilter("all")}
                 >
-                  all
+                  すべて
                 </button>
                 {(["pending", "passed", "failed", "blocked", "skipped"] as const).map((status) => (
                   <button
@@ -217,21 +220,27 @@ export function TestRunView() {
                     key={status}
                     onClick={() => setFilter(status)}
                   >
-                    {status} {progress[status]}
+                    {statusLabel(status)} {progress[status]}
                   </button>
                 ))}
               </div>
             </section>
+            <p className="usage-hint">
+              各項目を確認し、結果ボタンを押して記録します。不合格・ブロック・スキップの場合は理由が必要です。
+              「履歴」から過去の記録も確認できます。
+            </p>
             <ol className="items">
               {visibleItems.map((item) => (
                 <li key={item.value.id}>
                   <div>
                     {item.value.hierarchy.length > 0 && <small>{item.value.hierarchy.join(" / ")}</small>}
                     <span>{item.value.text}</span>
-                    <strong className={`status ${item.value.status}`}>{item.value.status}</strong>
+                    <strong className={`status ${item.value.status}`}>{statusLabel(item.value.status)}</strong>
                     {item.value.lastExecutedBy && (
                       <small>
-                        Last executed by {item.value.lastExecutedBy} · {item.value.lastExecutedAt}
+                        最終実施者: {item.value.lastExecutedBy}
+                        {item.value.lastExecutedAt &&
+                          ` · ${new Date(item.value.lastExecutedAt).toLocaleString("ja-JP")}`}
                       </small>
                     )}
                     {item.value.lastComment && <small>メモ: {item.value.lastComment}</small>}
@@ -246,7 +255,7 @@ export function TestRunView() {
                         disabled={run.data?.value.state !== "inProgress" || execute.isPending}
                         onClick={() => chooseStatus(item, status)}
                       >
-                        {status}
+                        {statusLabel(status)}
                       </button>
                     ))}
                     <button type="button" className="quiet" onClick={() => showHistory(item.value.id)}>
@@ -282,42 +291,40 @@ export function TestRunView() {
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Complete this test run?\nPassed ${progress.passed}\nFailed ${progress.failed}\nBlocked ${progress.blocked}\nSkipped ${progress.skipped}\n\n${metadataReview(run.data?.value || {})}`,
+                        `このテスト実行を完了しますか？\n合格 ${progress.passed} 件\n不合格 ${progress.failed} 件\nブロック ${progress.blocked} 件\nスキップ ${progress.skipped} 件\n\n${metadataReview(run.data?.value || {})}`,
                       )
                     )
                       complete.mutate();
                   }}
                 >
-                  {progress.pending > 0 ? `${progress.pending}件の未実施テストがあります` : "Complete test run"}
+                  {progress.pending > 0 ? `${progress.pending}件の未実施テストがあります` : "テストを完了する"}
                 </button>
                 <button
                   type="button"
                   className="quiet"
                   disabled={cancel.isPending}
                   onClick={() => {
-                    if (
-                      window.confirm("Cancel this test run? Current results and execution history will be preserved.")
-                    )
+                    if (window.confirm("このテスト実行をキャンセルしますか？現在の結果と実施履歴は保持されます。"))
                       cancel.mutate();
                   }}
                 >
-                  Cancel run
+                  実行をキャンセル
                 </button>
               </>
             )}
             {run.data.value.state === "completed" && (
               <button type="button" disabled={reopen.isPending} onClick={() => reopen.mutate()}>
-                Reopen
+                再開する
               </button>
             )}
-            {run.data.value.state !== "inProgress" && <Link to="/test-runs">Back to runs</Link>}
+            {run.data.value.state !== "inProgress" && <Link to="/test-runs">実行一覧へ戻る</Link>}
             <button type="button" className="quiet" onClick={copyReport}>
               PR 用の結果概要をコピー
             </button>
             {reportMessage && <p role="status">{reportMessage}</p>}
             {commentTarget && (
-              <section className="comment-editor" aria-label="Execution evidence">
-                <h2>{commentTarget.status} の結果を記録</h2>
+              <section className="comment-editor" aria-label="実施結果の記録">
+                <h2>{statusLabel(commentTarget.status)}の結果を記録</h2>
                 <label>
                   {commentTarget.status === "skipped"
                     ? "スキップ理由（必須）"
@@ -328,18 +335,26 @@ export function TestRunView() {
                 </label>
                 <label>
                   証跡 URL
-                  <input type="url" value={evidenceUrl} onChange={(event) => setEvidenceUrl(event.target.value)} />
+                  <small>スクリーンショットや動画など、結果を確認できる場所を入力します（任意）。</small>
+                  <input
+                    aria-label="証跡 URL"
+                    type="url"
+                    value={evidenceUrl}
+                    onChange={(event) => setEvidenceUrl(event.target.value)}
+                  />
                 </label>
                 <label>
                   障害チケット URL
+                  <small>不具合に関連するチケットがある場合に入力します（任意）。</small>
                   <input
+                    aria-label="障害チケット URL"
                     type="url"
                     value={issueTicketUrl}
                     onChange={(event) => setIssueTicketUrl(event.target.value)}
                   />
                 </label>
                 <button type="button" className="quiet" onClick={() => setCommentTarget(undefined)}>
-                  Cancel
+                  入力をやめる
                 </button>
                 <button
                   type="button"
@@ -360,13 +375,13 @@ export function TestRunView() {
                     )
                   }
                 >
-                  Save {commentTarget.status}
+                  {statusLabel(commentTarget.status)}として保存
                 </button>
               </section>
             )}
             {historyItem && (
               <section className="history">
-                <h2>Execution history</h2>
+                <h2>実施履歴</h2>
                 <button type="button" className="quiet" onClick={closeHistory}>
                   閉じる
                 </button>
@@ -375,7 +390,8 @@ export function TestRunView() {
                 ) : (
                   history.data?.map((entry) => (
                     <p key={entry.value.id}>
-                      <strong>{entry.value.status}</strong> · {entry.value.executedBy} · {entry.value.executedAt}
+                      <strong>{statusLabel(entry.value.status)}</strong> · {entry.value.executedBy} ·{" "}
+                      {new Date(entry.value.executedAt).toLocaleString("ja-JP")}
                       {entry.value.comment ? ` · ${entry.value.comment}` : ""}
                       {entry.value.evidenceUrl ? (
                         <>
@@ -417,4 +433,20 @@ function metadataReview(value: import("../../api").RunDetails): string {
     ["アプリ版（変更後）", value.appVersionAfter],
   ];
   return `記録を確認してください（不要な版は未記録のまま完了できます）:\n${fields.map(([name, content]) => `${name}: ${content || "未記録"}`).join("\n")}`;
+}
+
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: "未実施",
+    passed: "合格",
+    failed: "不合格",
+    blocked: "ブロック",
+    skipped: "スキップ",
+  };
+  return labels[status] || status;
+}
+
+function stateLabel(state: string): string {
+  const labels: Record<string, string> = { inProgress: "実施中", completed: "完了", cancelled: "キャンセル" };
+  return labels[state] || state;
 }

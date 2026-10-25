@@ -58,11 +58,11 @@ describe("test runs dashboard", () => {
 
     renderApp("/test-runs");
 
-    expect(await screen.findByText("PR #142")).toBeTruthy();
-    expect(screen.getByText("Active runs")).toBeTruthy();
-    expect(screen.getByText("Recent runs")).toBeTruthy();
-    expect(screen.getByText("inProgress")).toBeTruthy();
-    expect(screen.getByText("failed")).toBeTruthy();
+    expect(await screen.findByText("プルリクエスト #142")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "実施中" })).toBeTruthy();
+    expect(screen.getByText("最近の実行")).toBeTruthy();
+    expect(screen.getByText("実施中", { selector: ".run-badge" })).toBeTruthy();
+    expect(screen.getByText("不合格", { selector: ".run-badge" })).toBeTruthy();
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
     expect(screen.getByText("Release 2", { exact: false }).textContent).toContain("https://staging.test");
     expect(screen.getByText("Release 2", { exact: false }).textContent).toContain("Firefox 140");

@@ -15,3 +15,5 @@ coverage/
 
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
+
+__azurite_db_*

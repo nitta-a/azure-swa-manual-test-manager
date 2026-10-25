@@ -18,12 +18,16 @@ describe("shared views", () => {
   it("renders a page title and a link back to runs", () => {
     render(
       <MemoryRouter>
-        <Page title="Details">content</Page>
+        <Page title="詳細" description="画面の説明">
+          content
+        </Page>
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Details" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Manual Test Manager" }).getAttribute("href")).toBe("/test-runs");
+    expect(screen.getByRole("heading", { name: "詳細" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Manual Test Manager/ }).getAttribute("href")).toBe("/test-runs");
+    expect(screen.getByRole("navigation", { name: "メインメニュー" })).toBeTruthy();
+    expect(screen.getByText("画面の説明")).toBeTruthy();
     expect(screen.getByText("content")).toBeTruthy();
   });
 });

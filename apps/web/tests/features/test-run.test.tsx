@@ -41,7 +41,7 @@ describe("test run feature", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { clipboard: { writeText } });
     renderApp("/test-runs/run-1");
-    fireEvent.click(await screen.findByRole("button", { name: "Complete test run" }));
+    fireEvent.click(await screen.findByRole("button", { name: "テストを完了する" }));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining("対象環境: 未記録"));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Viewer版: 未記録"));
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -50,7 +50,7 @@ describe("test run feature", () => {
     expect(writeText.mock.calls[0]?.[0]).toContain("makerVersion: maker-2");
     expect(writeText.mock.calls[0]?.[0]).toContain("browser: Firefox 140");
     expect(writeText.mock.calls[0]?.[0]).toContain("appVersionAfter: 2.0");
-    expect(writeText.mock.calls[0]?.[0]).toContain("Definition: selected-sha");
+    expect(writeText.mock.calls[0]?.[0]).toContain("定義: selected-sha");
   });
 
   it("loads execution history for a test item", async () => {
@@ -120,10 +120,10 @@ describe("test run feature", () => {
     renderApp("/test-runs/run-1");
 
     expect(await screen.findByText("Can login")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "failed" }));
-    expect(screen.getByRole("button", { name: "Save failed" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: "不合格" }));
+    expect(screen.getByRole("button", { name: "不合格として保存" })).toHaveProperty("disabled", true);
     fireEvent.change(screen.getByLabelText("実施メモ（必須）"), { target: { value: "HTTP 500" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save failed" }));
+    fireEvent.click(screen.getByRole("button", { name: "不合格として保存" }));
 
     await waitFor(() =>
       expect(fetchMock.mock.calls[1]?.[1]).toEqual(
@@ -151,12 +151,12 @@ describe("test run feature", () => {
     renderApp("/test-runs/run-1");
 
     expect(await screen.findByText("Can login")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "passed" }));
+    fireEvent.click(screen.getByRole("button", { name: "合格" }));
     fireEvent.change(screen.getByLabelText("証跡 URL"), { target: { value: "https://example.test/evidence.png" } });
     fireEvent.change(screen.getByLabelText("障害チケット URL"), {
       target: { value: "https://example.test/issues/42" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save passed" }));
+    fireEvent.click(screen.getByRole("button", { name: "合格として保存" }));
 
     await waitFor(() =>
       expect(fetchMock.mock.calls[1]?.[1]).toEqual(
