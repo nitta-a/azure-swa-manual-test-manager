@@ -20,8 +20,24 @@ export function useTestRun() {
     enabled: Boolean(historyItem),
   });
   const execute = useMutation({
-    mutationFn: ({ item, status, comment }: { item: Item; status: string; comment?: string }) =>
-      api.execute(runId, item.value.id, item.etag, status, comment),
+    mutationFn: ({
+      item,
+      status,
+      comment,
+      evidenceUrl,
+      issueTicketUrl,
+    }: {
+      item: Item;
+      status: string;
+      comment?: string;
+      evidenceUrl?: string;
+      issueTicketUrl?: string;
+    }) =>
+      api.execute(runId, item.value.id, item.etag, status, {
+        ...(comment ? { comment } : {}),
+        ...(evidenceUrl ? { evidenceUrl } : {}),
+        ...(issueTicketUrl ? { issueTicketUrl } : {}),
+      }),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["run", runId] });
       client.invalidateQueries({ queryKey: ["executions", runId] });

@@ -27,14 +27,17 @@ Static Web Apps Standard
 
 1. The user chooses Azure Repos, GitHub, or App Managed.
 2. `TestDefinitionResolver` reads either a PR HEAD commit or the current App Managed revision.
-3. Repository sources validate the manifest and parse only the selected Markdown files.
-4. The resolved structured definition becomes a run, suite snapshots, and pending items; later definition changes are never read by that run.
-5. Each execution first updates the item with `If-Match`, then appends an immutable execution record. A stale ETag returns conflict instead of silent last-write-wins.
-6. Completion requires zero pending items and calculates `failed > blocked > passed`; skipped is not a failure.
+3. Repository sources validate the manifest and parse selected Markdown files; headings, nested parent conditions, checklist order, and the original Markdown are retained in the run snapshot.
+4. Run creation records selected and excluded checklist items, source-definition revision/commit, release and environment details, target application versions, and execution conditions. Later definition changes are never read by that run.
+5. Each execution first updates the item with `If-Match`, then appends an immutable execution record. If history persistence fails, the service attempts to restore the item; a stale ETag returns conflict instead of silent last-write-wins.
+6. Completion requires zero pending in-scope items. Failed or blocked results prevent a passing result; a run containing only skipped items is blocked. A completed run and a release-ready result are separate concepts.
+7. Execution records retain the tester, timestamp, memo, evidence URL, issue URL, and every re-execution. A skipped item requires a reason.
 
 The domain package has no Azure, GitHub, Functions, React, or storage SDK dependency. Source-control and Table Storage implementations are adapters behind interfaces, so the API service can be tested with in-memory implementations.
 
 Repository Direct keeps the repository as source of truth. Import creates an App Managed revision with provider, repository, PR, commit, and user provenance; it does not establish synchronization in either direction. App Managed edits create immutable revisions, and the definition current-pointer update uses `If-Match` semantics and returns `409` on conflict.
+
+Run selection can target suites, chapters, or individual items. The run view shows the original Markdown and safe HTTP(S) links for reference, labels excluded items, and offers a copyable PR report with the fixed run URL, result counts, unresolved failures, and skip reasons.
 
 Definition deletion is an archive operation, so definitions used by historical runs and their immutable run snapshots remain readable.
 

@@ -1,3 +1,4 @@
+import { testItemSelectionId } from "@manual-test-manager/domain";
 import { parseManifest } from "@manual-test-manager/manifest";
 import { parseTestMarkdown } from "@manual-test-manager/markdown-parser";
 import type { PullRequestRef, SourceControlProviderKind } from "@manual-test-manager/source-control";
@@ -16,9 +17,17 @@ export interface ResolvedTestDefinition {
   suites: Array<{
     id: string;
     title: string;
+    order: number;
     sourcePath?: string;
     sourceContent?: string;
-    items: Array<{ id?: string; hierarchy: string[]; text: string; order: number }>;
+    items: Array<{
+      id: string;
+      hierarchy: string[];
+      text: string;
+      order: number;
+      suiteOrder: number;
+      inScope?: boolean;
+    }>;
   }>;
 }
 
@@ -42,9 +51,15 @@ async function resolveRepository(
       return {
         id: suite.id,
         title: suite.title,
+        order: manifest.suites.findIndex((entry) => entry.id === suite.id),
         sourcePath: suite.path,
         sourceContent,
-        items: parsed.items.map((item, order) => ({ ...item, order })),
+        items: parsed.items.map((item, order) => ({
+          ...item,
+          id: testItemSelectionId(suite.id, String(order)),
+          order,
+          suiteOrder: manifest.suites.findIndex((entry) => entry.id === suite.id),
+        })),
       };
     }),
   );
@@ -70,13 +85,15 @@ async function resolveAppManaged(
     suites: selected.map((suite) => ({
       id: suite.value.id,
       title: suite.value.title,
+      order: suite.value.order,
       items: items
         .filter((item) => item.value.suiteId === suite.value.id)
         .map((item) => ({
-          id: item.value.id,
+          id: testItemSelectionId(suite.value.id, item.value.id),
           hierarchy: item.value.hierarchy,
           text: item.value.text,
           order: item.value.order,
+          suiteOrder: suite.value.order,
         })),
     })),
   };
@@ -86,9 +103,27 @@ export function resolveTestDefinition(
   context: ServiceContext,
   source: DefinitionSource,
   suiteIds: string[],
+  itemIds?: string[],
 ): Promise<ResolvedTestDefinition> {
-  if (source.type === "appManaged") return resolveAppManaged(context, source.definitionId, suiteIds);
-  return resolveRepository(context, source.type, source.repositoryId, source.pullRequestId, suiteIds);
+  const resolved =
+    source.type === "appManaged"
+      ? resolveAppManaged(context, source.definitionId, suiteIds)
+      : resolveRepository(context, source.type, source.repositoryId, source.pullRequestId, suiteIds);
+  if (!itemIds) return resolved;
+  return resolved.then((definition) => {
+    const available = new Set(definition.suites.flatMap((suite) => suite.items.map((item) => item.id)));
+    if (itemIds.some((id) => !available.has(id)))
+      throw new ServiceError(400, "one or more item ids are not in the selected suites");
+    const selectedIds = new Set(itemIds);
+    if (selectedIds.size === 0) throw new ServiceError(400, "select at least one test item");
+    return {
+      ...definition,
+      suites: definition.suites.map((suite) => ({
+        ...suite,
+        items: suite.items.map((item) => ({ ...item, inScope: selectedIds.has(item.id) })),
+      })),
+    };
+  });
 }
 
 export async function getRepositoryDefinition(
@@ -101,5 +136,20 @@ export async function getRepositoryDefinition(
   if (!client) throw new ServiceError(503, `${provider} is not configured`);
   const pullRequest = await client.getPullRequest(pullRequestId);
   const manifest = parseManifest(await client.getFile(context.manifestPath, pullRequest.sourceCommitId));
-  return { pullRequest, manifest, suites: manifest.suites, provider, repositoryId };
+  const suites = await Promise.all(
+    manifest.suites.map(async (suite) => {
+      const sourceMarkdown = await client.getFile(suite.path, pullRequest.sourceCommitId);
+      return {
+        ...suite,
+        sourceMarkdown,
+        order: manifest.suites.findIndex((entry) => entry.id === suite.id),
+        items: parseTestMarkdown(sourceMarkdown).items.map((item, order) => ({
+          ...item,
+          id: testItemSelectionId(suite.id, String(order)),
+          order,
+        })),
+      };
+    }),
+  );
+  return { pullRequest, manifest, suites, provider, repositoryId };
 }

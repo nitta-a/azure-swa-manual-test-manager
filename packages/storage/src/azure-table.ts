@@ -137,7 +137,9 @@ class SuiteTable implements TestRunSuiteRepository {
       },
     }))
       output.push(fromEntity(item));
-    return output;
+    return output.sort(
+      (a, b) => (a.value.order ?? Number.MAX_SAFE_INTEGER) - (b.value.order ?? Number.MAX_SAFE_INTEGER),
+    );
   }
 }
 
@@ -165,7 +167,11 @@ class ItemTable implements TestRunItemRepository {
       },
     }))
       output.push(itemFromEntity(item));
-    return output;
+    return output.sort((a, b) => {
+      const suiteOrder =
+        (a.value.suiteOrder ?? Number.MAX_SAFE_INTEGER) - (b.value.suiteOrder ?? Number.MAX_SAFE_INTEGER);
+      return suiteOrder || (a.value.order ?? Number.MAX_SAFE_INTEGER) - (b.value.order ?? Number.MAX_SAFE_INTEGER);
+    });
   }
   async update(item: TestRunItem, expectedEtag: string) {
     try {

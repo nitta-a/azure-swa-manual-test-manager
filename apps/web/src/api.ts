@@ -29,6 +29,8 @@ export interface Suite {
   id: string;
   title: string;
   path: string;
+  sourceMarkdown: string;
+  items: Array<{ id: string; hierarchy: string[]; text: string; order: number }>;
 }
 export interface Definition {
   pullRequest: PullRequest;
@@ -50,9 +52,15 @@ export interface Item {
     suiteId: string;
     hierarchy: string[];
     text: string;
+    order?: number;
+    suiteOrder?: number;
+    inScope?: boolean;
     status: "pending" | "passed" | "failed" | "blocked" | "skipped";
     lastExecutedBy?: string;
     lastExecutedAt?: string;
+    lastComment?: string;
+    lastEvidenceUrl?: string;
+    lastIssueTicketUrl?: string;
   };
   etag: string;
 }
@@ -77,6 +85,20 @@ export interface TestRunSummary {
   failedCount: number;
   blockedCount: number;
   skippedCount: number;
+  excludedCount?: number;
+}
+export interface RunDetails {
+  releaseName?: string;
+  environmentUrl?: string;
+  makerVersion?: string;
+  viewerVersion?: string;
+  functionsVersion?: string;
+  appVersionBefore?: string;
+  appVersionAfter?: string;
+  browser?: string;
+  operatingSystem?: string;
+  locale?: string;
+  featureConfiguration?: string;
 }
 export interface Run {
   value: {
@@ -86,8 +108,21 @@ export interface Run {
     sourceType?: string;
     sourceCommitId?: string;
     definitionRevisionId?: string;
+    releaseName?: string;
+    environmentUrl?: string;
+    makerVersion?: string;
+    viewerVersion?: string;
+    functionsVersion?: string;
+    appVersionBefore?: string;
+    appVersionAfter?: string;
+    browser?: string;
+    operatingSystem?: string;
+    locale?: string;
+    featureConfiguration?: string;
   };
-  suites: unknown[];
+  suites: Array<{
+    value: { suiteId: string; title: string; sourceMarkdown?: string; sourcePath?: string; order?: number };
+  }>;
   items: Item[];
 }
 export interface Execution {
@@ -97,6 +132,8 @@ export interface Execution {
     executedBy: string;
     executedAt: string;
     comment?: string;
+    evidenceUrl?: string;
+    issueTicketUrl?: string;
   };
 }
 
@@ -120,13 +157,15 @@ export const api = {
       | { type: "azureRepos" | "github"; repositoryId: string; pullRequestId: number }
       | { type: "appManaged"; definitionId: string },
     suiteIds: string[],
+    itemIds?: string[],
+    details: RunDetails = {},
   ) =>
     request<{ value: { id: string } }>("/test-runs", {
       method: "POST",
       body: JSON.stringify(
         typeof sourceOrPullRequestId === "number"
-          ? { repositoryId, pullRequestId: sourceOrPullRequestId, suiteIds }
-          : { source: sourceOrPullRequestId, suiteIds },
+          ? { repositoryId, pullRequestId: sourceOrPullRequestId, suiteIds, itemIds, ...details }
+          : { source: sourceOrPullRequestId, suiteIds, itemIds, ...details },
       ),
     }),
   getRun: (runId: string) => request<Run>(`/test-runs/${runId}`),
@@ -142,11 +181,17 @@ export const api = {
       `/test-runs${query.toString() ? `?${query}` : ""}`,
     );
   },
-  execute: (runId: string, itemId: string, etag: string, status: string, comment?: string) =>
+  execute: (
+    runId: string,
+    itemId: string,
+    etag: string,
+    status: string,
+    details: { comment?: string; evidenceUrl?: string; issueTicketUrl?: string } | string = {},
+  ) =>
     request(`/test-runs/${runId}/items/${itemId}/executions`, {
       method: "POST",
       headers: { "if-match": etag },
-      body: JSON.stringify({ itemId, status, ...(comment ? { comment } : {}) }),
+      body: JSON.stringify({ itemId, status, ...(typeof details === "string" ? { comment: details } : details) }),
     }),
   executions: (runId: string, itemId: string) => request<Execution[]>(`/test-runs/${runId}/items/${itemId}/executions`),
   complete: (runId: string) => request(`/test-runs/${runId}/complete`, { method: "POST" }),

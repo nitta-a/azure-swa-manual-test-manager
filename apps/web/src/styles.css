@@ -65,7 +65,8 @@ fieldset {
 }
 label,
 select,
-textarea {
+textarea,
+input:not([type="checkbox"]) {
   display: grid;
   gap: 5px;
 }
@@ -158,6 +159,38 @@ legend {
 }
 .check small {
   grid-column: 2;
+}
+.chapter {
+  border-top: 1px solid #e9eef6;
+  padding: 10px 0 0 20px;
+}
+.source-preview,
+.excluded-items,
+.run-details {
+  background: white;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.source-preview pre {
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: #f6f8fb;
+}
+.run-details > div {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 3fr;
+  gap: 12px;
+  padding: 4px 0;
+}
+.run-details dt {
+  font-weight: 700;
+}
+.run-details dd {
+  margin: 0;
 }
 button {
   border: 0;

@@ -1,3 +1,4 @@
+import { testItemSelectionId } from "@manual-test-manager/domain";
 import type { SourceControlClient } from "@manual-test-manager/source-control";
 import { InMemoryRepositories } from "@manual-test-manager/storage";
 import { expect, test } from "vitest";
@@ -21,17 +22,35 @@ test("App Managed edits create revisions without changing an existing run snapsh
   );
   const created = await service.createTestDefinition(
     "Smoke",
-    { suites: [{ id: "login", title: "Login", items: [{ hierarchy: [], text: "Sign in" }] }] },
+    {
+      suites: [
+        {
+          id: "login",
+          title: "Login",
+          items: [
+            { hierarchy: ["Authentication"], text: "Sign in" },
+            { hierarchy: ["Authentication"], text: "Sign out" },
+          ],
+        },
+      ],
+    },
     "alice",
   );
   const definition = await service.getTestDefinitionById(created.value.id);
+  const firstItem = definition.items[0]?.value;
+  if (!firstItem) throw new Error("fixture item missing");
   const run = await service.start({
     source: { type: "appManaged", definitionId: created.value.id },
     suiteIds: ["login"],
+    itemIds: [testItemSelectionId("login", firstItem.id)],
     startedBy: "alice",
+    releaseName: "v1",
+    browser: "Firefox",
   });
   const [before] = await service.listItems(run.value.id);
   if (!definition.value || !before) throw new Error("fixture missing");
+  expect(run.value).toMatchObject({ releaseName: "v1", browser: "Firefox" });
+  expect((await service.listItems(run.value.id)).map((item) => item.value.inScope)).toEqual([true, false]);
   await service.updateTestDefinition(
     created.value.id,
     "Smoke v2",
@@ -40,7 +59,7 @@ test("App Managed edits create revisions without changing an existing run snapsh
     definition.etag,
   );
   const after = await service.listItems(run.value.id);
-  expect(after[0]?.value.text).toBe("Sign in");
+  expect(after.map((item) => item.value.text)).toEqual(["Sign in", "Sign out"]);
   expect((await service.getTestDefinitionById(created.value.id)).value.name).toBe("Smoke v2");
 });
 

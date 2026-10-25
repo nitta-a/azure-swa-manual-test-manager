@@ -1,5 +1,9 @@
 import type { TestRunResult, TestRunState, TestStatus } from "./test-status.js";
 
+export function testItemSelectionId(suiteId: string, itemId: string): string {
+  return `${encodeURIComponent(suiteId)}:${encodeURIComponent(itemId)}`;
+}
+
 export type TestRunSourceType = "azureRepos" | "github" | "appManaged";
 
 export interface TestRun {
@@ -12,6 +16,17 @@ export interface TestRun {
   sourceCommitId?: string;
   definitionId?: string;
   definitionRevisionId?: string;
+  releaseName?: string;
+  environmentUrl?: string;
+  makerVersion?: string;
+  viewerVersion?: string;
+  functionsVersion?: string;
+  appVersionBefore?: string;
+  appVersionAfter?: string;
+  browser?: string;
+  operatingSystem?: string;
+  locale?: string;
+  featureConfiguration?: string;
   state: TestRunState;
   result?: TestRunResult;
   startedBy: string;
@@ -41,12 +56,14 @@ export interface TestRunSummary {
   failedCount: number;
   blockedCount: number;
   skippedCount: number;
+  excludedCount?: number;
 }
 
 export interface TestRunSuite {
   runId: string;
   suiteId: string;
   title: string;
+  order?: number;
   filePath?: string;
   sourceMarkdown?: string;
   sourcePath?: string;
@@ -59,9 +76,15 @@ export interface TestRunItem {
   suiteId: string;
   hierarchy: string[];
   text: string;
+  order?: number;
+  suiteOrder?: number;
+  inScope?: boolean;
   status: TestStatus;
   lastExecutedBy?: string;
   lastExecutedAt?: string;
+  lastComment?: string;
+  lastEvidenceUrl?: string;
+  lastIssueTicketUrl?: string;
 }
 
 export interface TestExecution {
@@ -72,6 +95,8 @@ export interface TestExecution {
   executedBy: string;
   executedAt: string;
   comment?: string;
+  evidenceUrl?: string;
+  issueTicketUrl?: string;
 }
 
 export interface TestDefinition {

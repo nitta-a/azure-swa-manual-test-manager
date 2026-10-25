@@ -24,7 +24,8 @@ export function calculateRunProgress(items: readonly { status: TestStatus }[]): 
 
 export function calculateRunResult(statuses: readonly TestStatus[]): TestRunResult {
   if (statuses.includes("failed")) return "failed";
-  if (statuses.includes("blocked")) return "blocked";
+  if (statuses.includes("blocked") || statuses.length === 0 || statuses.every((status) => status === "skipped"))
+    return "blocked";
   return "passed";
 }
 

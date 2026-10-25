@@ -1,8 +1,10 @@
+import { testItemSelectionId } from "@manual-test-manager/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { api, type ManagedDefinition } from "../../api";
+import { api, type ManagedDefinition, type RunDetails } from "../../api";
 import { ErrorMessage } from "../shared/ErrorMessage";
 import { Page } from "../shared/Page";
+import { RunMetadataFields } from "../shared/RunMetadataFields";
 
 type DraftSuite = { id: string; title: string; items: Array<{ id?: string; hierarchy: string[]; text: string }> };
 
@@ -10,6 +12,8 @@ export function DefinitionsView() {
   const client = useQueryClient();
   const definitions = useQuery({ queryKey: ["test-definitions"], queryFn: api.listTestDefinitions });
   const [selectedId, setSelectedId] = useState<string>();
+  const [runItemIds, setRunItemIds] = useState<string[]>([]);
+  const [runDetails, setRunDetails] = useState<RunDetails>({});
   const [name, setName] = useState("New definition");
   const [draftSuites, setDraftSuites] = useState<DraftSuite[]>([
     { id: "default", title: "Default", items: [{ hierarchy: [], text: "New test" }] },
@@ -37,6 +41,7 @@ export function DefinitionsView() {
   });
   useEffect(() => {
     if (!selected.data) return;
+    setRunItemIds(selected.data.items.map((item) => testItemSelectionId(item.value.suiteId, item.value.id)));
     setDraftSuites(
       selected.data.suites.map((suite) => ({
         id: suite.value.id,
@@ -76,11 +81,17 @@ export function DefinitionsView() {
     },
   });
   const start = useMutation({
-    mutationFn: (value: ManagedDefinition) =>
-      api.startRun(
+    mutationFn: (value: ManagedDefinition) => {
+      const selectedItems = value.items.filter((item) =>
+        runItemIds.includes(testItemSelectionId(item.value.suiteId, item.value.id)),
+      );
+      return api.startRun(
         { type: "appManaged", definitionId: value.value.id },
-        value.suites.map((suite) => suite.value.id),
-      ),
+        [...new Set(selectedItems.map((item) => item.value.suiteId))],
+        selectedItems.map((item) => testItemSelectionId(item.value.suiteId, item.value.id)),
+        runDetails,
+      );
+    },
     onSuccess: (run) => {
       window.location.href = `/test-runs/${run.value.id}`;
     },
@@ -336,11 +347,101 @@ export function DefinitionsView() {
           <button type="button" onClick={() => update.mutate(selected.data)} disabled={update.isPending}>
             Save revision
           </button>
-          <button type="button" onClick={() => start.mutate(selected.data)} disabled={start.isPending}>
+          <fieldset>
+            <legend>実施する項目を選択</legend>
+            {selected.data.suites.map((suite) => {
+              const suiteItems = selected.data.items.filter((item) => item.value.suiteId === suite.value.id);
+              return (
+                <div className="suite-selection" key={suite.value.id}>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={
+                        suiteItems.length > 0 &&
+                        suiteItems.every((item) =>
+                          runItemIds.includes(testItemSelectionId(suite.value.id, item.value.id)),
+                        )
+                      }
+                      onChange={(event) => {
+                        const itemIds = suiteItems.map((item) => testItemSelectionId(suite.value.id, item.value.id));
+                        setRunItemIds((current) =>
+                          event.target.checked
+                            ? [...new Set([...current, ...itemIds])]
+                            : current.filter((id) => !itemIds.includes(id)),
+                        );
+                      }}
+                    />
+                    {suite.value.title}
+                  </label>
+                  {groupByChapter(suiteItems).map((group) => (
+                    <div className="chapter" key={group.items[0]?.value.id || group.title}>
+                      {group.title && (
+                        <label className="check">
+                          <input
+                            type="checkbox"
+                            checked={group.items.every((item) =>
+                              runItemIds.includes(testItemSelectionId(suite.value.id, item.value.id)),
+                            )}
+                            onChange={(event) => {
+                              const itemIds = group.items.map((item) =>
+                                testItemSelectionId(suite.value.id, item.value.id),
+                              );
+                              setRunItemIds((current) =>
+                                event.target.checked
+                                  ? [...new Set([...current, ...itemIds])]
+                                  : current.filter((id) => !itemIds.includes(id)),
+                              );
+                            }}
+                          />
+                          {group.title}
+                        </label>
+                      )}
+                      {group.items.map((item) => (
+                        <label className="check" key={item.value.id}>
+                          <input
+                            type="checkbox"
+                            checked={runItemIds.includes(testItemSelectionId(suite.value.id, item.value.id))}
+                            onChange={(event) =>
+                              setRunItemIds((current) =>
+                                event.target.checked
+                                  ? [...new Set([...current, testItemSelectionId(suite.value.id, item.value.id)])]
+                                  : current.filter((id) => id !== testItemSelectionId(suite.value.id, item.value.id)),
+                              )
+                            }
+                          />
+                          {item.value.hierarchy.slice(1).join(" / ")} {item.value.text}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </fieldset>
+          <RunMetadataFields
+            details={runDetails}
+            onChange={(key, value) => setRunDetails((current) => ({ ...current, [key]: value }))}
+          />
+          <button
+            type="button"
+            onClick={() => start.mutate(selected.data)}
+            disabled={start.isPending || runItemIds.length === 0}
+          >
             Start test run
           </button>
         </section>
       )}
     </Page>
   );
+}
+
+function groupByChapter<T extends { value: { hierarchy: string[] } }>(items: T[]) {
+  const groups: Array<{ title: string; items: T[] }> = [];
+  for (const item of items) {
+    const title = item.value.hierarchy[0] || "";
+    const last = groups.at(-1);
+    if (last?.title === title) last.items.push(item);
+    else groups.push({ title, items: [item] });
+  }
+  return groups;
 }

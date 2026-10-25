@@ -254,6 +254,7 @@ class InMemorySuites implements TestRunSuiteRepository {
   async listByRun(runId: string) {
     return [...this.values.values()]
       .filter((entry) => entry.value.runId === runId)
+      .sort((a, b) => (a.value.order ?? Number.MAX_SAFE_INTEGER) - (b.value.order ?? Number.MAX_SAFE_INTEGER))
       .map((entry) => ({ value: copy(entry.value), etag: entry.etag }));
   }
 }
@@ -272,6 +273,11 @@ class InMemoryItems implements TestRunItemRepository {
   async listByRun(runId: string) {
     return [...this.values.values()]
       .filter((entry) => entry.value.runId === runId)
+      .sort((a, b) => {
+        const suiteOrder =
+          (a.value.suiteOrder ?? Number.MAX_SAFE_INTEGER) - (b.value.suiteOrder ?? Number.MAX_SAFE_INTEGER);
+        return suiteOrder || (a.value.order ?? Number.MAX_SAFE_INTEGER) - (b.value.order ?? Number.MAX_SAFE_INTEGER);
+      })
       .map((entry) => ({ value: copy(entry.value), etag: entry.etag }));
   }
   async update(item: TestRunItem, expectedEtag: string) {

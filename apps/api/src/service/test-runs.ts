@@ -21,7 +21,7 @@ export async function start(context: ServiceContext, input: StartTestRunInput): 
       : (() => {
           throw new ServiceError(400, "source is required");
         })());
-  const definition = await resolveTestDefinition(context, source, input.suiteIds);
+  const definition = await resolveTestDefinition(context, source, input.suiteIds, input.itemIds);
   const runBase = {
     id: randomUUID(),
     state: "inProgress" as const,
@@ -35,6 +35,7 @@ export async function start(context: ServiceContext, input: StartTestRunInput): 
           sourceType: "appManaged",
           definitionId: definition.source.definitionId,
           definitionRevisionId: definition.source.revisionId,
+          ...runMetadata(input),
         }
       : {
           ...runBase,
@@ -43,13 +44,14 @@ export async function start(context: ServiceContext, input: StartTestRunInput): 
           pullRequestId: definition.source.pullRequest.id,
           sourceBranch: definition.source.pullRequest.sourceBranch,
           sourceCommitId: definition.source.pullRequest.sourceCommitId,
+          ...runMetadata(input),
         };
-  const created = await context.repositories.runs.create(run);
   for (const suite of definition.suites) {
     await context.repositories.suites.create({
       runId: run.id,
       suiteId: suite.id,
       title: suite.title,
+      ...(suite.order !== undefined ? { order: suite.order } : {}),
       ...(suite.sourcePath ? { filePath: suite.sourcePath, sourcePath: suite.sourcePath } : {}),
       ...(suite.sourceContent ? { sourceMarkdown: suite.sourceContent, sourceContent: suite.sourceContent } : {}),
     });
@@ -60,10 +62,14 @@ export async function start(context: ServiceContext, input: StartTestRunInput): 
         suiteId: suite.id,
         hierarchy: item.hierarchy,
         text: item.text,
+        ...(item.order !== undefined ? { order: item.order } : {}),
+        ...(item.suiteOrder !== undefined ? { suiteOrder: item.suiteOrder } : {}),
+        ...(item.inScope !== undefined ? { inScope: item.inScope } : {}),
         status: "pending",
       });
     }
   }
+  const created = await context.repositories.runs.create(run);
   await syncSummary(context, run.id);
   return created;
 }
@@ -94,7 +100,8 @@ export async function list(context: ServiceContext, query: TestRunSummaryQuery) 
 export async function syncSummary(context: ServiceContext, runId: string): Promise<Versioned<TestRunSummary>> {
   const run = await requireRun(context.repositories, runId);
   const items = await context.repositories.items.listByRun(runId);
-  const progress = calculateRunProgress(items.map((item) => item.value));
+  const inScopeItems = items.filter((item) => item.value.inScope !== false);
+  const progress = calculateRunProgress(inScopeItems.map((item) => item.value));
   const value: TestRunSummary = {
     runId,
     projectId: context.projectId,
@@ -108,6 +115,7 @@ export async function syncSummary(context: ServiceContext, runId: string): Promi
     failedCount: progress.failed,
     blockedCount: progress.blocked,
     skippedCount: progress.skipped,
+    ...(items.length > inScopeItems.length ? { excludedCount: items.length - inScopeItems.length } : {}),
     ...(run.value.repositoryId ? { repositoryId: run.value.repositoryId } : {}),
     ...(run.value.pullRequestId !== undefined ? { pullRequestId: run.value.pullRequestId } : {}),
     ...(run.value.definitionId ? { definitionId: run.value.definitionId } : {}),
@@ -128,17 +136,35 @@ export async function complete(
   const run = await requireRun(context.repositories, runId);
   if (run.value.state !== "inProgress") throw new ServiceError(409, "only in-progress runs can be completed");
   const items = await context.repositories.items.listByRun(runId);
-  if (hasPendingItems(items.map((item) => item.value.status)))
+  const inScopeItems = items.filter((item) => item.value.inScope !== false);
+  if (inScopeItems.length === 0) throw new ServiceError(409, "run has no selected test items");
+  if (hasPendingItems(inScopeItems.map((item) => item.value.status)))
     throw new ServiceError(409, "all items must be executed before completion");
   const updated = await context.repositories.runs.update({
     ...run.value,
     state: "completed",
-    result: calculateRunResult(items.map((item) => item.value.status)),
+    result: calculateRunResult(inScopeItems.map((item) => item.value.status)),
     completedBy,
     completedAt: context.now(),
   });
   await syncSummary(context, runId);
   return updated;
+}
+
+function runMetadata(input: StartTestRunInput) {
+  return {
+    ...(input.releaseName ? { releaseName: input.releaseName } : {}),
+    ...(input.environmentUrl ? { environmentUrl: input.environmentUrl } : {}),
+    ...(input.makerVersion ? { makerVersion: input.makerVersion } : {}),
+    ...(input.viewerVersion ? { viewerVersion: input.viewerVersion } : {}),
+    ...(input.functionsVersion ? { functionsVersion: input.functionsVersion } : {}),
+    ...(input.appVersionBefore ? { appVersionBefore: input.appVersionBefore } : {}),
+    ...(input.appVersionAfter ? { appVersionAfter: input.appVersionAfter } : {}),
+    ...(input.browser ? { browser: input.browser } : {}),
+    ...(input.operatingSystem ? { operatingSystem: input.operatingSystem } : {}),
+    ...(input.locale ? { locale: input.locale } : {}),
+    ...(input.featureConfiguration ? { featureConfiguration: input.featureConfiguration } : {}),
+  };
 }
 
 export async function reopen(context: ServiceContext, runId: string): Promise<Versioned<TestRun>> {

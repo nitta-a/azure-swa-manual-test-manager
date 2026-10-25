@@ -1,5 +1,5 @@
 import type { AzureDevOpsClient, PullRequest } from "@manual-test-manager/azure-devops";
-import type { ManifestV1 } from "@manual-test-manager/manifest";
+import type { ManifestSuite, ManifestV1 } from "@manual-test-manager/manifest";
 import type { ServiceContext } from "./context.js";
 import { ServiceError } from "./errors.js";
 import { getRepositoryDefinition } from "./resolver.js";
@@ -25,7 +25,13 @@ export async function getTestDefinition(
 ): Promise<{
   pullRequest: PullRequest;
   manifest: ManifestV1;
-  suites: ManifestV1["suites"];
+  suites: Array<
+    ManifestSuite & {
+      sourceMarkdown: string;
+      order: number;
+      items: Array<{ id: string; hierarchy: string[]; text: string; order: number }>;
+    }
+  >;
 }> {
   return getRepositoryDefinition(context, pullRequestId, provider, repositoryId);
 }
