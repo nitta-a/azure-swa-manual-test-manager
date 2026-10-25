@@ -32,6 +32,6 @@ describe("pull requests feature", () => {
     renderRoute(<PullRequestsView />, "/pull-requests", "/pull-requests");
 
     expect(await screen.findByRole("link", { name: /#42 Add login/ })).toBeTruthy();
-    expect(screen.getByText("refs/heads/feature/login → refs/heads/main")).toBeTruthy();
+    expect(screen.getByText("ブランチ: refs/heads/feature/login → refs/heads/main")).toBeTruthy();
   });
 });

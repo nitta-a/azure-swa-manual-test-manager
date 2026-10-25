@@ -20,6 +20,6 @@ describe("App routes", () => {
 
     renderApp("/unknown");
 
-    expect(await screen.findByRole("heading", { name: "Test runs" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "テスト実行" })).toBeTruthy();
   });
 });

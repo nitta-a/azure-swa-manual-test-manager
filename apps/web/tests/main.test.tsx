@@ -21,6 +21,6 @@ describe("application entry point", () => {
 
     await import("../src/main");
 
-    expect(await screen.findByRole("heading", { name: "Test runs" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "テスト実行" })).toBeTruthy();
   });
 });

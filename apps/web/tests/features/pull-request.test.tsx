@@ -45,7 +45,7 @@ describe("pull request feature", () => {
     fireEvent.click(await screen.findByRole("checkbox", { name: "デッキ" }));
     expect(screen.getByRole("checkbox", { name: /Chrome/ })).toHaveProperty("checked", false);
     expect(screen.getByRole("checkbox", { name: /Translate/ })).toHaveProperty("checked", false);
-    fireEvent.click(screen.getByRole("button", { name: "テスト開始" }));
+    fireEvent.click(screen.getByRole("button", { name: "選択した項目でテストを開始" }));
     await screen.findByText(/test definition changed/);
     const startRequest = fetchMock.mock.calls.find(([path]) => path === "/api/test-runs");
     expect(JSON.parse(startRequest?.[1].body)).toMatchObject({
@@ -92,14 +92,14 @@ describe("pull request feature", () => {
     renderApp("/pull-requests/42");
 
     const checkboxes = await screen.findAllByRole("checkbox");
-    const startButton = screen.getByRole("button", { name: "テスト開始" });
+    const startButton = screen.getByRole("button", { name: "選択した項目でテストを開始" });
     expect((startButton as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(checkboxes[0] as HTMLInputElement);
     expect((startButton as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(startButton);
 
-    await screen.findByRole("heading", { name: "Test run" });
+    await screen.findByRole("heading", { name: "テスト実行の詳細" });
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/test-runs", expect.objectContaining({ method: "POST" })),
     );

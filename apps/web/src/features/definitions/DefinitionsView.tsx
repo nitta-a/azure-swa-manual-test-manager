@@ -15,9 +15,9 @@ export function DefinitionsView() {
   const [selectedId, setSelectedId] = useState<string>();
   const [runItemIds, setRunItemIds] = useState<string[]>([]);
   const [runDetails, setRunDetails] = useState<RunDetails>({});
-  const [name, setName] = useState("New definition");
+  const [name, setName] = useState("新しいテスト定義");
   const [draftSuites, setDraftSuites] = useState<DraftSuite[]>([
-    { id: "default", title: "Default", items: [{ hierarchy: [], text: "New test" }] },
+    { id: "default", title: "基本テスト", items: [{ hierarchy: [], text: "新しいテスト項目" }] },
   ]);
   const [provider, setProvider] = useState<"azureRepos" | "github">("azureRepos");
   const repositoryId =
@@ -105,7 +105,10 @@ export function DefinitionsView() {
   });
 
   return (
-    <Page title="App Managed definitions">
+    <Page
+      title="テスト定義"
+      description="アプリ内でテスト手順を作成・編集するか、プルリクエストに含まれる Markdown のテスト定義を取り込めます。定義を選び、実施項目と環境情報を指定してテストを開始してください。"
+    >
       <ErrorMessage
         error={
           definitions.error ||
@@ -119,36 +122,38 @@ export function DefinitionsView() {
         }
       />
       <section className="history">
-        <h2>Create definition</h2>
-        <input aria-label="Definition name" value={name} onChange={(event) => setName(event.target.value)} />
+        <h2>新しい定義を作成</h2>
+        <p>定義名を入力して作成し、あとからスイートやテスト項目を追加できます。</p>
+        <input aria-label="定義名" value={name} onChange={(event) => setName(event.target.value)} />
         <button type="button" onClick={() => create.mutate()} disabled={create.isPending}>
-          Create
+          定義を作成
         </button>
         <button
           type="button"
           onClick={() =>
             setDraftSuites((current) => [
               ...current,
-              { id: `suite-${current.length + 1}`, title: "New suite", items: [] },
+              { id: `suite-${current.length + 1}`, title: "新しいスイート", items: [] },
             ])
           }
         >
-          Add suite
+          スイートを追加
         </button>
       </section>
       <section className="history">
-        <h2>Import from repository</h2>
+        <h2>リポジトリから取り込む</h2>
+        <p>プロバイダーとプルリクエストを選び、取り込むスイートにチェックを入れてください。</p>
         <select
-          aria-label="Import provider"
+          aria-label="取り込み元"
           value={provider}
           onChange={(event) => setProvider(event.target.value as typeof provider)}
         >
           <option value="azureRepos">Azure Repos</option>
           <option value="github">GitHub</option>
         </select>
-        <input aria-label="Repository" value={repositoryId} readOnly />
+        <input aria-label="リポジトリ" value={repositoryId} readOnly />
         <select
-          aria-label="Pull request"
+          aria-label="プルリクエスト"
           value={pullRequestId}
           onChange={(event) => setPullRequestId(event.target.value)}
         >
@@ -159,7 +164,7 @@ export function DefinitionsView() {
           ))}
         </select>
         <fieldset>
-          <legend>Suites</legend>
+          <legend>取り込むスイート</legend>
           {importDefinition.data?.suites.map((suite) => (
             <label key={suite.id}>
               <input
@@ -180,33 +185,46 @@ export function DefinitionsView() {
           onClick={() => importMutation.mutate()}
           disabled={importMutation.isPending || suiteIds.length === 0}
         >
-          Import
+          選択したスイートを取り込む
         </button>
       </section>
-      <ul className="cards">
-        {definitions.data?.map((entry) => (
-          <li key={entry.value.id}>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedId(entry.value.id);
-                setName(entry.value.name);
-              }}
-            >
-              {entry.value.name}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <section>
+        <h2>保存済みのテスト定義</h2>
+        <p>定義を選ぶと、内容の編集とテスト実行の準備ができます。</p>
+        {definitions.data?.length ? (
+          <ul className="cards">
+            {definitions.data.map((entry) => (
+              <li key={entry.value.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedId(entry.value.id);
+                    setName(entry.value.name);
+                  }}
+                >
+                  {entry.value.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          !definitions.isPending && (
+            <p className="empty-state">
+              定義はまだありません。上のフォームから作成するか、リポジトリから取り込んでください。
+            </p>
+          )
+        )}
+      </section>
       {selected.data && (
         <section className="history">
-          <h2>Edit {selected.data.value.name}</h2>
-          <input aria-label="Edit definition name" value={name} onChange={(event) => setName(event.target.value)} />
+          <h2>「{selected.data.value.name}」を編集</h2>
+          <p>スイート内の手順を整えて変更を保存します。テストの実施時は、対象項目を選択できます。</p>
+          <input aria-label="定義名を編集" value={name} onChange={(event) => setName(event.target.value)} />
           {draftSuites.map((suite, suiteIndex) => (
             <fieldset key={suite.id}>
               <legend>{suite.title}</legend>
               <input
-                aria-label={`Suite ${suiteIndex + 1} title`}
+                aria-label={`スイート${suiteIndex + 1}の名前`}
                 value={suite.title}
                 onChange={(event) =>
                   setDraftSuites((current) =>
@@ -220,7 +238,7 @@ export function DefinitionsView() {
                 type="button"
                 onClick={() => setDraftSuites((current) => current.filter((_, index) => index !== suiteIndex))}
               >
-                Delete suite
+                スイートを削除
               </button>
               <button
                 type="button"
@@ -234,7 +252,7 @@ export function DefinitionsView() {
                   })
                 }
               >
-                Move up
+                上へ移動
               </button>
               <button
                 type="button"
@@ -248,12 +266,12 @@ export function DefinitionsView() {
                   })
                 }
               >
-                Move down
+                下へ移動
               </button>
               {suite.items.map((item, itemIndex) => (
                 <div key={item.id || `${suite.id}-${itemIndex}`}>
                   <input
-                    aria-label={`Suite ${suiteIndex + 1} item ${itemIndex + 1}`}
+                    aria-label={`スイート${suiteIndex + 1}の項目${itemIndex + 1}`}
                     value={item.text}
                     onChange={(event) =>
                       setDraftSuites((current) =>
@@ -285,7 +303,7 @@ export function DefinitionsView() {
                       )
                     }
                   >
-                    Move up
+                    上へ移動
                   </button>
                   <button
                     type="button"
@@ -302,7 +320,7 @@ export function DefinitionsView() {
                       )
                     }
                   >
-                    Move down
+                    下へ移動
                   </button>
                   <button
                     type="button"
@@ -316,7 +334,7 @@ export function DefinitionsView() {
                       )
                     }
                   >
-                    Delete item
+                    項目を削除
                   </button>
                 </div>
               ))}
@@ -326,13 +344,13 @@ export function DefinitionsView() {
                   setDraftSuites((current) =>
                     current.map((entry, index) =>
                       index === suiteIndex
-                        ? { ...entry, items: [...entry.items, { hierarchy: [], text: "New test" }] }
+                        ? { ...entry, items: [...entry.items, { hierarchy: [], text: "新しいテスト項目" }] }
                         : entry,
                     ),
                   )
                 }
               >
-                Add item
+                テスト項目を追加
               </button>
             </fieldset>
           ))}
@@ -341,14 +359,14 @@ export function DefinitionsView() {
             onClick={() =>
               setDraftSuites((current) => [
                 ...current,
-                { id: `suite-${current.length + 1}`, title: "New suite", items: [] },
+                { id: `suite-${current.length + 1}`, title: "新しいスイート", items: [] },
               ])
             }
           >
-            Add suite
+            スイートを追加
           </button>
           <button type="button" onClick={() => update.mutate(selected.data)} disabled={update.isPending}>
-            Save revision
+            変更を保存
           </button>
           <fieldset>
             <legend>実施する項目を選択</legend>
@@ -430,7 +448,7 @@ export function DefinitionsView() {
             onClick={() => start.mutate(selected.data)}
             disabled={start.isPending || runItemIds.length === 0}
           >
-            Start test run
+            選択した項目でテストを開始
           </button>
         </section>
       )}
