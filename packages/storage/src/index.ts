@@ -25,7 +25,8 @@ export class ETagConflictError extends Error {
 export interface TestRunRepository {
   create(run: TestRun): Promise<Versioned<TestRun>>;
   get(runId: string): Promise<Versioned<TestRun> | undefined>;
-  update(run: TestRun): Promise<Versioned<TestRun>>;
+  list(): Promise<Array<Versioned<TestRun>>>;
+  update(run: TestRun, expectedEtag: string): Promise<Versioned<TestRun>>;
 }
 export interface TestRunSummaryQuery {
   state?: TestRunSummary["state"];
@@ -202,8 +203,11 @@ class InMemoryRuns implements TestRunRepository {
     const result = this.values.get(id);
     return result ? normalizeRun(result) : undefined;
   }
-  async update(run: TestRun) {
-    if (!this.values.has(run.id)) throw new Error("run not found");
+  async list() {
+    return [...this.values.values()].map(normalizeRun);
+  }
+  async update(run: TestRun, expectedEtag: string) {
+    if (this.values.get(run.id)?.etag !== expectedEtag) throw new ETagConflictError();
     return this.save(run);
   }
   private save(run: TestRun) {
@@ -293,8 +297,19 @@ class InMemoryItems implements TestRunItemRepository {
 class InMemoryExecutions implements TestExecutionRepository {
   private readonly values = new Map<string, Versioned<TestExecution>>();
   async create(execution: TestExecution) {
+    const key = `${execution.runId}/${execution.itemId}/${execution.id}`;
+    const existing = this.values.get(key);
+    if (existing) {
+      if (
+        Object.keys({ ...existing.value, ...execution }).some(
+          (field) => existing.value[field as keyof TestExecution] !== execution[field as keyof TestExecution],
+        )
+      )
+        throw new Error("execution id already exists with different content");
+      return { value: copy(existing.value), etag: existing.etag };
+    }
     const result = { value: copy(execution), etag: crypto.randomUUID() };
-    this.values.set(`${execution.runId}/${execution.itemId}/${execution.id}`, result);
+    this.values.set(key, result);
     return { value: copy(result.value), etag: result.etag };
   }
   async listByItem(runId: string, itemId: string) {

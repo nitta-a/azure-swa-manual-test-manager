@@ -37,4 +37,8 @@ test("maps pull requests and fetches files at a commit", async () => {
   expect(await client.getFile("tests/a.md", "abc")).toBe("hello");
   expect(urls).toHaveLength(2);
   expect(urls[1] ?? "").toMatch(/versionDescriptor\.version=abc/);
+  const source = new URL(client.getFileUrl?.("checks/ReleaseCheck.md", "abc") || "");
+  expect(source.pathname).toBe("/acme/Project%20A/_git/repo");
+  expect(source.searchParams.get("path")).toBe("/checks/ReleaseCheck.md");
+  expect(source.searchParams.get("version")).toBe("GCabc");
 });

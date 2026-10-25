@@ -1,6 +1,6 @@
 import type { AzureDevOpsClient, PullRequest } from "@manual-test-manager/azure-devops";
 import { InMemoryRepositories } from "@manual-test-manager/storage";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { TestRunService } from "../src/service.js";
 
 const pullRequest: PullRequest = {
@@ -22,6 +22,7 @@ suites:
 `;
 
 function fixture() {
+  let sourceCommitId = pullRequest.sourceCommitId;
   const files: Record<string, string> = {
     "manifest.yml": manifest,
     "tests/smoke.md": "## Login\n- [ ] sign in\n- [ ] sign out",
@@ -33,7 +34,7 @@ function fixture() {
       return [pullRequest];
     },
     async getPullRequest() {
-      return pullRequest;
+      return { ...pullRequest, sourceCommitId };
     },
     async getFile(path, commitId) {
       fileRequests.push({ path, commitId });
@@ -43,8 +44,17 @@ function fixture() {
     },
   };
   const repositories = new InMemoryRepositories();
-  const service = new TestRunService(repositories, devOps, "manifest.yml", () => "2026-01-01T00:00:00.000Z");
-  return { fileRequests, repositories, service };
+  const service = new TestRunService(repositories, devOps, "manifest.yml", () => "2026-01-01T00:00:00.000Z", {
+    providers: { github: devOps },
+  });
+  return {
+    fileRequests,
+    repositories,
+    service,
+    advance: () => {
+      sourceCommitId = "new-commit";
+    },
+  };
 }
 
 async function startRun(service: TestRunService, suiteIds: string[] = ["smoke"]) {
@@ -217,14 +227,14 @@ test("returns a run with its suites and items and records executions", async () 
   });
 });
 
-test("restores the current item if execution history cannot be saved", async () => {
+test("recovers a durable result and history after history storage becomes available", async () => {
   const { service, repositories } = fixture();
   const created = await startRun(service);
   const [item] = await service.listItems(created.value.id);
   if (!item) throw new Error("item fixture is missing");
-  repositories.executions.create = async () => {
-    throw new Error("history storage unavailable");
-  };
+  const save = vi
+    .spyOn(repositories.executions, "create")
+    .mockRejectedValueOnce(new Error("history storage unavailable"));
 
   await expect(
     service.execute(created.value.id, {
@@ -234,10 +244,119 @@ test("restores the current item if execution history cannot be saved", async () 
       expectedEtag: item.etag,
     }),
   ).rejects.toThrow("history storage unavailable");
+  expect((await repositories.items.get(created.value.id, item.value.id))?.value.pendingExecution).toBeDefined();
   const [restored] = await service.listItems(created.value.id);
-  expect(restored?.value).toMatchObject({ status: "pending" });
-  expect(restored?.value.lastExecutedBy).toBeUndefined();
-  await expect(service.listExecutions(created.value.id, item.value.id)).resolves.toHaveLength(0);
+  expect(restored?.value).toMatchObject({ status: "passed", lastExecutedBy: "alice" });
+  expect(restored?.value.pendingExecution).toBeUndefined();
+  await expect(service.listExecutions(created.value.id, item.value.id)).resolves.toHaveLength(1);
+  expect(save).toHaveBeenCalledTimes(2);
+});
+
+test("recovers a committed history after its response was lost without rolling back another result", async () => {
+  const { service, repositories } = fixture();
+  const run = await startRun(service);
+  const [item] = await service.listItems(run.value.id);
+  if (!item) throw new Error("missing item");
+  const create = repositories.executions.create.bind(repositories.executions);
+  vi.spyOn(repositories.executions, "create").mockImplementationOnce(async (execution) => {
+    await create(execution);
+    throw new Error("response lost");
+  });
+  await expect(
+    service.execute(run.value.id, {
+      itemId: item.value.id,
+      status: "passed",
+      executedBy: "alice",
+      expectedEtag: item.etag,
+    }),
+  ).rejects.toThrow("response lost");
+  const recovered = await service.get(run.value.id);
+  const current = recovered.items[0];
+  if (!current) throw new Error("missing item");
+  await service.execute(run.value.id, {
+    itemId: item.value.id,
+    status: "failed",
+    comment: "new failure",
+    executedBy: "bob",
+    expectedEtag: current.etag,
+  });
+  expect((await service.listExecutions(run.value.id, item.value.id)).map((entry) => entry.value.executedBy)).toEqual([
+    "alice",
+    "bob",
+  ]);
+  expect((await service.get(run.value.id)).items[0]?.value.status).toBe("failed");
+});
+
+test("rebuilds missing and stale summaries after a failed start or result projection", async () => {
+  const { service, repositories } = fixture();
+  const summary = vi.spyOn(repositories.summaries, "upsert").mockRejectedValueOnce(new Error("summary unavailable"));
+  await expect(startRun(service)).rejects.toThrow("summary unavailable");
+  const recovered = await service.listRuns({});
+  expect(recovered.items).toHaveLength(1);
+  const runId = recovered.items[0]?.runId || "";
+  const [item] = await service.listItems(runId);
+  if (!item) throw new Error("missing item");
+  summary.mockRejectedValueOnce(new Error("summary unavailable"));
+  await expect(
+    service.execute(runId, {
+      itemId: item.value.id,
+      status: "passed",
+      executedBy: "alice",
+      expectedEtag: item.etag,
+    }),
+  ).rejects.toThrow("summary unavailable");
+  expect((await service.listRuns({})).items[0]).toMatchObject({ passedCount: 1, pendingCount: 1 });
+  expect(await service.listExecutions(runId, item.value.id)).toHaveLength(1);
+});
+
+test("recovery cannot overwrite a concurrent result with an older outbox snapshot", async () => {
+  const { service, repositories } = fixture();
+  const run = await startRun(service);
+  const [item] = await service.listItems(run.value.id);
+  if (!item) throw new Error("missing item");
+  const execution = {
+    id: "interrupted",
+    runId: run.value.id,
+    itemId: item.value.id,
+    status: "passed" as const,
+    executedBy: "alice",
+    executedAt: "2026-01-01T00:00:00Z",
+  };
+  const pending = await repositories.items.update(
+    {
+      ...item.value,
+      status: "passed",
+      pendingExecution: execution,
+    },
+    item.etag,
+  );
+  const create = repositories.executions.create.bind(repositories.executions);
+  vi.spyOn(repositories.executions, "create").mockImplementationOnce(async (entry) => {
+    await create(entry);
+    await repositories.items.update({ ...item.value, status: "failed", lastExecutedBy: "bob" }, pending.etag);
+    return { value: entry, etag: "" };
+  });
+  const recovered = await service.get(run.value.id);
+  expect(recovered.items[0]?.value).toMatchObject({ status: "failed", lastExecutedBy: "bob" });
+  expect((await service.listRuns({})).items[0]?.failedCount).toBe(1);
+});
+
+test("rejects a changed selection version before publishing a run", async () => {
+  for (const type of ["azureRepos", "github"] as const) {
+    const { service, repositories, advance } = fixture();
+    const selected = await service.getTestDefinition(42, type);
+    advance();
+    await expect(
+      service.start({
+        source: { type, repositoryId: "repo-1", pullRequestId: 42 },
+        suiteIds: ["smoke"],
+        itemIds: ["smoke:0"],
+        expectedDefinitionVersion: selected.pullRequest.sourceCommitId,
+        startedBy: "alice",
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(await repositories.runs.list()).toHaveLength(0);
+  }
 });
 
 test("requires comments for failed and blocked executions", async () => {
@@ -318,6 +437,11 @@ test("calculates a failed result, makes completion read-only, and reopens it", a
   expect(reopened.value).toMatchObject({ state: "inProgress" });
   expect(reopened.value.result).toBeUndefined();
   expect(reopened.value.completedAt).toBeUndefined();
+  expect(reopened.value.completedBy).toBeUndefined();
+  const summary = (await service.listRuns({})).items[0];
+  expect(summary?.result).toBeUndefined();
+  expect(summary?.completedBy).toBeUndefined();
+  expect(summary?.completedAt).toBeUndefined();
 });
 
 test("calculates blocked when all executed items are non-failing", async () => {

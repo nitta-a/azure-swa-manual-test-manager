@@ -1,6 +1,7 @@
 import { type AzureDevOpsClient, createAzureDevOpsClient } from "@manual-test-manager/azure-devops";
 import { createGitHubClient } from "@manual-test-manager/github";
 import { createAzureTableRepositories, InMemoryRepositories, type RepositorySet } from "@manual-test-manager/storage";
+import { isLocalEnvironment } from "./environment.js";
 import { TestRunService } from "./service.js";
 
 class MissingDevOpsConfiguration implements AzureDevOpsClient {
@@ -21,6 +22,10 @@ class MissingDevOpsConfiguration implements AzureDevOpsClient {
 }
 
 export async function createServiceFromEnvironment(): Promise<TestRunService> {
+  if (!process.env.AZURE_STORAGE_CONNECTION_STRING?.trim() && !isLocalEnvironment())
+    throw new Error(
+      "AZURE_STORAGE_CONNECTION_STRING is required outside local development; in-memory storage is disabled",
+    );
   const repositories: RepositorySet = process.env.AZURE_STORAGE_CONNECTION_STRING
     ? await createAzureTableRepositories(process.env.AZURE_STORAGE_CONNECTION_STRING)
     : new InMemoryRepositories();

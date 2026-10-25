@@ -1,3 +1,4 @@
+import { groupByChapter } from "../shared/chapters";
 import { ErrorMessage } from "../shared/ErrorMessage";
 import { Page } from "../shared/Page";
 import { RunMetadataFields } from "../shared/RunMetadataFields";
@@ -38,7 +39,7 @@ export function PullRequestView() {
                     <summary>原文 Markdown を参照</summary>
                     <pre>{suite.sourceMarkdown}</pre>
                   </details>
-                  {groupByChapter(suite.items).map((group) => (
+                  {groupByChapter(suite.items, (item) => item.hierarchy).map((group) => (
                     <div className="chapter" key={group.items[0]?.id || group.title}>
                       {group.title && (
                         <label className="check">
@@ -84,15 +85,4 @@ export function PullRequestView() {
       )}
     </Page>
   );
-}
-
-function groupByChapter<T extends { id: string; hierarchy: string[] }>(items: T[]) {
-  const groups: Array<{ title: string; items: T[] }> = [];
-  for (const item of items) {
-    const title = item.hierarchy[0] || "";
-    const last = groups.at(-1);
-    if (last?.title === title) last.items.push(item);
-    else groups.push({ title, items: [item] });
-  }
-  return groups;
 }

@@ -8,6 +8,7 @@ const sourceSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("appManaged"), definitionId: id }),
 ]);
 const startSchema = z.object({
+  expectedDefinitionVersion: id,
   source: sourceSchema.optional(),
   repositoryId: id.optional(),
   pullRequestId: z.number().int().positive().optional(),
@@ -62,6 +63,7 @@ export const createTestRun: Handler = async (request, _context, service) => {
     featureConfiguration,
   } = body;
   const input = {
+    expectedDefinitionVersion: body.expectedDefinitionVersion,
     suiteIds,
     startedBy: principalUserId(request),
     ...(itemIds ? { itemIds } : {}),

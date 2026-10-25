@@ -23,6 +23,9 @@ describe("test runs dashboard", () => {
             runId: "active-run",
             projectId: "default",
             sourceType: "github",
+            releaseName: "Release 2",
+            environmentUrl: "https://staging.test",
+            browser: "Firefox 140",
             pullRequestId: 142,
             state: "inProgress",
             startedBy: "alice",
@@ -61,5 +64,7 @@ describe("test runs dashboard", () => {
     expect(screen.getByText("inProgress")).toBeTruthy();
     expect(screen.getByText("failed")).toBeTruthy();
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    expect(screen.getByText("Release 2", { exact: false }).textContent).toContain("https://staging.test");
+    expect(screen.getByText("Release 2", { exact: false }).textContent).toContain("Firefox 140");
   });
 });

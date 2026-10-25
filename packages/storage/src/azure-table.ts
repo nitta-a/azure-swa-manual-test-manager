@@ -1,4 +1,4 @@
-import { TableClient, type TableEntity, type TableEntityResult } from "@azure/data-tables";
+import { TableClient, type TableEntityResult } from "@azure/data-tables";
 import type {
   TestDefinition,
   TestDefinitionItem,
@@ -43,20 +43,35 @@ function normalizeRun(result: Versioned<TestRun>): Versioned<TestRun> {
   return { etag: result.etag, value: { ...result.value, sourceType: result.value.sourceType || "azureRepos" } };
 }
 
-function itemEntity(item: TestRunItem): Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }> {
-  const { hierarchy, ...rest } = item;
-  return entity({ ...rest, hierarchy: JSON.stringify(hierarchy) }, item.runId, item.id);
+type StoredItem = Stored<
+  Omit<TestRunItem, "hierarchy" | "pendingExecution"> & {
+    hierarchy: string;
+    pendingExecution?: string;
+  }
+>;
+
+function itemEntity(item: TestRunItem): StoredItem {
+  const { hierarchy, pendingExecution, ...rest } = item;
+  return entity(
+    {
+      ...rest,
+      hierarchy: JSON.stringify(hierarchy),
+      ...(pendingExecution ? { pendingExecution: JSON.stringify(pendingExecution) } : {}),
+    },
+    item.runId,
+    item.id,
+  );
 }
 
-function itemFromEntity(
-  result: TableEntityResult<Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>>,
-): Versioned<TestRunItem> {
+function itemFromEntity(result: TableEntityResult<StoredItem>): Versioned<TestRunItem> {
   const parsed = fromEntity(result);
+  const { pendingExecution, ...value } = parsed.value;
   return {
     etag: parsed.etag,
     value: {
-      ...parsed.value,
+      ...value,
       hierarchy: JSON.parse(parsed.value.hierarchy) as string[],
+      ...(pendingExecution ? { pendingExecution: JSON.parse(pendingExecution) as TestExecution } : {}),
     },
   };
 }
@@ -75,9 +90,24 @@ class RunTable implements TestRunRepository {
       .next();
     return result.done ? undefined : normalizeRun(fromEntity(result.value));
   }
-  async update(run: TestRun) {
-    await this.table.upsertEntity(entity(run, run.repositoryId || run.definitionId || "app-managed", run.id), "Merge");
-    return this.get(run.id) as Promise<Versioned<TestRun>>;
+  async list() {
+    const runs: Array<Versioned<TestRun>> = [];
+    for await (const row of this.table.listEntities<Stored<TestRun>>()) runs.push(normalizeRun(fromEntity(row)));
+    return runs;
+  }
+  async update(run: TestRun, expectedEtag: string) {
+    requireEtag(expectedEtag);
+    try {
+      const response = await this.table.updateEntity(
+        entity(run, run.repositoryId || run.definitionId || "app-managed", run.id),
+        "Replace",
+        { etag: expectedEtag },
+      );
+      return { value: run, etag: responseEtag(response.etag) };
+    } catch (error) {
+      if (isPrecondition(error)) throw new ETagConflictError();
+      throw error;
+    }
   }
 }
 
@@ -151,9 +181,7 @@ class ItemTable implements TestRunItemRepository {
   }
   async get(runId: string, itemId: string) {
     try {
-      return itemFromEntity(
-        await this.table.getEntity<Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>>(runId, itemId),
-      );
+      return itemFromEntity(await this.table.getEntity<StoredItem>(runId, itemId));
     } catch (error) {
       if (isNotFound(error)) return undefined;
       throw error;
@@ -161,7 +189,7 @@ class ItemTable implements TestRunItemRepository {
   }
   async listByRun(runId: string) {
     const output: Array<Versioned<TestRunItem>> = [];
-    for await (const item of this.table.listEntities<Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>>({
+    for await (const item of this.table.listEntities<StoredItem>({
       queryOptions: {
         filter: `PartitionKey eq '${runId.replaceAll("'", "''")}'`,
       },
@@ -174,19 +202,24 @@ class ItemTable implements TestRunItemRepository {
     });
   }
   async update(item: TestRunItem, expectedEtag: string) {
+    requireEtag(expectedEtag);
     try {
-      await this.table.updateEntity(
-        { ...itemEntity(item), etag: expectedEtag } as TableEntity<
-          Stored<Omit<TestRunItem, "hierarchy"> & { hierarchy: string }>
-        >,
-        "Replace",
-      );
-      return this.get(item.runId, item.id) as Promise<Versioned<TestRunItem>>;
+      const response = await this.table.updateEntity(itemEntity(item), "Replace", { etag: expectedEtag });
+      return { value: item, etag: responseEtag(response.etag) };
     } catch (error) {
       if (isPrecondition(error)) throw new ETagConflictError();
       throw error;
     }
   }
+}
+
+function requireEtag(etag: string) {
+  if (!etag || etag === "*") throw new ETagConflictError("a specific ETag is required");
+}
+
+function responseEtag(etag: string | undefined): string {
+  if (!etag) throw new Error("Azure Table update response is missing an ETag");
+  return etag;
 }
 
 function isNotFound(error: unknown): boolean {
@@ -199,7 +232,22 @@ function isPrecondition(error: unknown): boolean {
 class ExecutionTable implements TestExecutionRepository {
   constructor(private readonly table: TableClient) {}
   async create(execution: TestExecution) {
-    await this.table.createEntity(entity(execution, execution.runId, `${execution.itemId}_${execution.id}`));
+    try {
+      await this.table.createEntity(entity(execution, execution.runId, `${execution.itemId}_${execution.id}`));
+    } catch (error) {
+      if (!(typeof error === "object" && error !== null && "statusCode" in error && error.statusCode === 409))
+        throw error;
+      const existing = fromEntity(
+        await this.table.getEntity<Stored<TestExecution>>(execution.runId, `${execution.itemId}_${execution.id}`),
+      );
+      if (
+        Object.keys({ ...existing.value, ...execution }).some(
+          (key) => existing.value[key as keyof TestExecution] !== execution[key as keyof TestExecution],
+        )
+      )
+        throw new Error("execution id already exists with different content");
+      return existing;
+    }
     return { value: execution, etag: "" };
   }
   async listByItem(runId: string, itemId: string) {
@@ -237,14 +285,14 @@ class DefinitionTable implements TestDefinitionRepository {
     return output;
   }
   async update(definition: TestDefinition, expectedEtag: string) {
+    requireEtag(expectedEtag);
     try {
-      await this.table.updateEntity(
-        { ...entity(definition, definition.projectId, definition.id), etag: expectedEtag } as TableEntity<
-          Stored<TestDefinition>
-        >,
+      const response = await this.table.updateEntity(
+        entity(definition, definition.projectId, definition.id),
         "Replace",
+        { etag: expectedEtag },
       );
-      return this.get(definition.projectId, definition.id) as Promise<Versioned<TestDefinition>>;
+      return { value: definition, etag: responseEtag(response.etag) };
     } catch (error) {
       if (isPrecondition(error)) throw new ETagConflictError();
       throw error;

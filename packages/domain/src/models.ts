@@ -8,6 +8,7 @@ export type TestRunSourceType = "azureRepos" | "github" | "appManaged";
 
 export interface TestRun {
   id: string;
+  projectId?: string;
   /** Missing on legacy rows; those rows are Azure Repos runs. */
   sourceType?: TestRunSourceType;
   repositoryId?: string;
@@ -57,6 +58,9 @@ export interface TestRunSummary {
   blockedCount: number;
   skippedCount: number;
   excludedCount?: number;
+  releaseName?: string;
+  environmentUrl?: string;
+  browser?: string;
 }
 
 export interface TestRunSuite {
@@ -68,6 +72,7 @@ export interface TestRunSuite {
   sourceMarkdown?: string;
   sourcePath?: string;
   sourceContent?: string;
+  sourceUrl?: string;
 }
 
 export interface TestRunItem {
@@ -85,6 +90,7 @@ export interface TestRunItem {
   lastComment?: string;
   lastEvidenceUrl?: string;
   lastIssueTicketUrl?: string;
+  pendingExecution?: TestExecution;
 }
 
 export interface TestExecution {
