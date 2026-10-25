@@ -2,6 +2,7 @@ import { testItemSelectionId } from "@manual-test-manager/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, type ManagedDefinition, type RunDetails } from "../../api";
+import { groupByChapter } from "../shared/chapters";
 import { ErrorMessage } from "../shared/ErrorMessage";
 import { Page } from "../shared/Page";
 import { RunMetadataFields } from "../shared/RunMetadataFields";
@@ -38,6 +39,7 @@ export function DefinitionsView() {
     queryKey: ["test-definition", selectedId],
     queryFn: () => api.getTestDefinitionById(selectedId || ""),
     enabled: Boolean(selectedId),
+    staleTime: Infinity,
   });
   useEffect(() => {
     if (!selected.data) return;
@@ -90,6 +92,7 @@ export function DefinitionsView() {
         [...new Set(selectedItems.map((item) => item.value.suiteId))],
         selectedItems.map((item) => testItemSelectionId(item.value.suiteId, item.value.id)),
         runDetails,
+        value.value.currentRevisionId,
       );
     },
     onSuccess: (run) => {
@@ -373,7 +376,7 @@ export function DefinitionsView() {
                     />
                     {suite.value.title}
                   </label>
-                  {groupByChapter(suiteItems).map((group) => (
+                  {groupByChapter(suiteItems, (item) => item.value.hierarchy).map((group) => (
                     <div className="chapter" key={group.items[0]?.value.id || group.title}>
                       {group.title && (
                         <label className="check">
@@ -433,15 +436,4 @@ export function DefinitionsView() {
       )}
     </Page>
   );
-}
-
-function groupByChapter<T extends { value: { hierarchy: string[] } }>(items: T[]) {
-  const groups: Array<{ title: string; items: T[] }> = [];
-  for (const item of items) {
-    const title = item.value.hierarchy[0] || "";
-    const last = groups.at(-1);
-    if (last?.title === title) last.items.push(item);
-    else groups.push({ title, items: [item] });
-  }
-  return groups;
 }

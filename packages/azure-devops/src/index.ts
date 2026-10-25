@@ -40,6 +40,9 @@ export function createAzureDevOpsClient(
     sourceCommitId: pr.lastMergeSourceCommit?.commitId ?? "",
   });
   return {
+    getFileUrl(path, commitId) {
+      return `${config.organizationUrl.replace(/\/$/, "")}/${encodeURIComponent(config.project)}/_git/${encodeURIComponent(config.repositoryId)}?path=${encodeURIComponent(`/${path.replace(/^\/+/, "")}`)}&version=GC${encodeURIComponent(commitId)}&_a=preview`;
+    },
     async listPullRequests() {
       const result = await request<{ value: PullRequestResponse[] }>(
         `${base}/pullrequests?searchCriteria.status=active&$top=100&api-version=7.1`,

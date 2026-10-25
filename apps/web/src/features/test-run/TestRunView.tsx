@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Item } from "../../api";
 import { ErrorMessage } from "../shared/ErrorMessage";
+import { markdownLinks } from "../shared/markdown-links";
 import { Page } from "../shared/Page";
 import { useTestRun } from "./useTestRun";
 
@@ -68,6 +69,20 @@ export function TestRunView() {
       `Run: ${runUrl}`,
       `Release: ${run.data.value.releaseName || "not specified"}`,
       `Environment: ${run.data.value.environmentUrl || "not specified"}`,
+      `Definition: ${run.data.value.sourceCommitId || run.data.value.definitionRevisionId || "not specified"}`,
+      ...(
+        [
+          "makerVersion",
+          "viewerVersion",
+          "functionsVersion",
+          "appVersionBefore",
+          "appVersionAfter",
+          "browser",
+          "operatingSystem",
+          "locale",
+          "featureConfiguration",
+        ] as const
+      ).map((key) => `${key}: ${run.data?.value[key] || "not specified"}`),
       `Results: ${progress.passed} passed, ${progress.failed} failed, ${progress.blocked} blocked, ${progress.skipped} skipped, ${progress.pending} pending`,
       `Out of scope: ${run.data.items.filter((item) => item.value.inScope === false).length}`,
       "",
@@ -149,9 +164,9 @@ export function TestRunView() {
               suite.value.sourceMarkdown ? (
                 <details className="source-preview" key={suite.value.suiteId}>
                   <summary>{suite.value.title} — 原文 Markdown</summary>
-                  {markdownLinks(suite.value.sourceMarkdown).length > 0 && (
+                  {markdownLinks(suite.value.sourceMarkdown, suite.value.sourceUrl).length > 0 && (
                     <ul aria-label={`${suite.value.title} links`}>
-                      {markdownLinks(suite.value.sourceMarkdown).map((link) => (
+                      {markdownLinks(suite.value.sourceMarkdown, suite.value.sourceUrl).map((link) => (
                         <li key={link.url}>
                           <a href={link.url} target="_blank" rel="noreferrer">
                             {link.title}
@@ -267,7 +282,7 @@ export function TestRunView() {
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Complete this test run?\nPassed ${progress.passed}\nFailed ${progress.failed}\nBlocked ${progress.blocked}\nSkipped ${progress.skipped}`,
+                        `Complete this test run?\nPassed ${progress.passed}\nFailed ${progress.failed}\nBlocked ${progress.blocked}\nSkipped ${progress.skipped}\n\n${metadataReview(run.data?.value || {})}`,
                       )
                     )
                       complete.mutate();
@@ -390,11 +405,16 @@ export function TestRunView() {
   );
 }
 
-function markdownLinks(markdown: string): Array<{ title: string; url: string }> {
-  const links = new Map<string, string>();
-  for (const match of markdown.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g)) {
-    const url = match[2];
-    if (url) links.set(url, match[1] || url);
-  }
-  return [...links].map(([url, title]) => ({ title, url }));
+function metadataReview(value: import("../../api").RunDetails): string {
+  const fields = [
+    ["リリース", value.releaseName],
+    ["対象環境", value.environmentUrl],
+    ["ブラウザ", value.browser],
+    ["Maker版", value.makerVersion],
+    ["Viewer版", value.viewerVersion],
+    ["Functions版", value.functionsVersion],
+    ["アプリ版（変更前）", value.appVersionBefore],
+    ["アプリ版（変更後）", value.appVersionAfter],
+  ];
+  return `記録を確認してください（不要な版は未記録のまま完了できます）:\n${fields.map(([name, content]) => `${name}: ${content || "未記録"}`).join("\n")}`;
 }

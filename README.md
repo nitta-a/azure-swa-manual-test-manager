@@ -31,7 +31,7 @@ pnpm typecheck
 pnpm test
 ```
 
-When the required environment variables are not set, the local API uses in-memory storage. To use Azure DevOps and Azurite, configure the app from `apps/api/local.settings.example.json`, then start the web app and API with the SWA CLI.
+Only explicit local development (`AZURE_FUNCTIONS_ENVIRONMENT=Development` or `NODE_ENV=development/test`, outside Azure hosting) may use in-memory storage. All other environments require `AZURE_STORAGE_CONNECTION_STRING` and refuse startup without it. To use Azure DevOps and Azurite, configure the app from `apps/api/local.settings.example.json`, then start the web app and API with the SWA CLI.
 
 ```sh
 cp apps/api/local.settings.example.json apps/api/local.settings.json
@@ -84,13 +84,15 @@ Markdown TestItems are checkbox list items only. Heading-formatted items (`## su
 
 ### Authentication and Static Web Apps
 
-Use the Standard plan for SWA and configure Entra ID Custom Authentication, through the portal or deployment settings, to allow only the target tenant. `staticwebapp.config.json` allows only the `authenticated` role. The API reads SWA's `x-ms-client-principal` as the trust boundary for user identity and is structured to support additional authorization.
+Use the Standard plan for SWA and tenant-specific Entra ID Custom Authentication. Both SWA routes and the production API require the invited `test-runner` role; tenant membership alone does not grant access. The API trusts only SWA's `x-ms-client-principal`, not `x-user-id`, outside local development. See [reproducible deployment and recovery](docs/deployment.md) for settings, packaging, CI, and acceptance checks.
 
 ### MVP scope
 
 The implemented core flow is: list PRs → list suites for a PR → select suites → fix a commit snapshot → record PASS / FAIL / BLOCKED / SKIPPED → view execution history. TestRunItem updates detect conflicts with `If-Match` and the Azure Table ETag.
 
 Existing runs do not change when a PR's HEAD is updated. A new run can be created for the same commit. Completed runs are read-only; reopening a run returns it to `inProgress` while preserving its snapshot, and never uses a newer PR HEAD.
+
+Run creation requires `expectedDefinitionVersion` (the selected PR commit or App Managed revision). A changed version returns 409 and requires reloading/reselecting, rather than applying positional item IDs to different instructions. Completion reviews release/environment/browser and application-version records; irrelevant version fields may remain blank. The list identifies release/environment/browser, and the PR report includes application versions and execution conditions.
 
 Test definitions have three sources: Azure Repos, GitHub, and App Managed. Repository runs snapshot the selected PR HEAD commit. App Managed stores structured suites/items in immutable revisions; changing the current definition never changes existing runs. Import copies a repository revision into App Managed and records provenance without synchronization.
 
@@ -127,7 +129,7 @@ pnpm typecheck
 pnpm test
 ```
 
-ローカル API は環境変数が揃わない場合インメモリ保存になります。Azure DevOps と Azurite を使う場合は `apps/api/local.settings.example.json` を元に設定し、SWA CLI から web と API を起動します。
+明示的なローカル開発（Azure 上ではなく `AZURE_FUNCTIONS_ENVIRONMENT=Development` または `NODE_ENV=development/test`）だけインメモリ保存を許可します。それ以外は `AZURE_STORAGE_CONNECTION_STRING` が必須で、未設定なら起動・利用を拒否します。Azure DevOps と Azurite を使う場合は `apps/api/local.settings.example.json` を元に設定し、SWA CLI から web と API を起動します。
 
 ```sh
 cp apps/api/local.settings.example.json apps/api/local.settings.json
@@ -180,13 +182,15 @@ Markdown の TestItem は checkbox list だけです。Heading 形式（`## suit
 
 ### 認証と Static Web Apps
 
-SWA は Standard plan とし、Entra ID の Custom Authentication は対象テナントに限定する設定をポータルまたはデプロイ設定で行います。`staticwebapp.config.json` は authenticated role のみを許可します。API は SWA の `x-ms-client-principal` をユーザー identity の信頼境界として読み取り、authorization を追加できる形です。
+SWA は Standard plan とし、Entra ID Custom Authentication を対象テナントに限定します。SWA と本番 API の両方で招待済みの `test-runner` role を必須とし、同じテナントのユーザーでも担当メンバーでなければアクセスできません。本番 API は SWA の `x-ms-client-principal` だけを信頼し、`x-user-id` は受け付けません。[デプロイ・復旧手順](docs/deployment.md) に設定、配布物、CI、受入確認をまとめています。
 
 ### MVP の境界
 
 実装済みの中心フローは、PR 一覧 → PR の suite 一覧 → suite 選択 → commit snapshot 固定 → PASS / FAIL / BLOCKED / SKIPPED → execution 履歴閲覧です。TestRunItem の更新は `If-Match` と Azure Table の ETag で競合を検知します。
 
 PR の HEAD 更新後も既存 Run は変化しません。同じ commit でも新しい Run を作成できます。完了後は read-only、reopen は snapshot を維持したまま inProgress に戻し、PR の HEAD 更新には使いません。
+
+Run 開始 API は選択時の PR commit または App Managed revision を `expectedDefinitionVersion` として必須にします。変更時は 409 とし、再読込・再選択を求めます。完了前にリリース・環境・ブラウザ・対象アプリ版の記録を確認でき、不要な版は空欄のまま完了できます。一覧はリリース・環境・ブラウザを表示し、PR 用概要は対象アプリ版・実施条件も含めます。
 
 Test definition の source は Azure Repos、GitHub、App Managed の3種類です。Repository run は PR HEAD commit を snapshot します。App Managed は structured suites/items と immutable revision を保存し、Import は provenance を残しますが同期は行いません。
 

@@ -26,6 +26,7 @@ import {
 export { ServiceError } from "./service/errors.js";
 
 export interface StartTestRunInput {
+  expectedDefinitionVersion?: string;
   source?:
     | { type: "azureRepos"; repositoryId: string; pullRequestId: number }
     | { type: "github"; repositoryId: string; pullRequestId: number }

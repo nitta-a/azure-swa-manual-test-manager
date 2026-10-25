@@ -12,4 +12,5 @@ export interface SourceControlClient {
   listPullRequests(): Promise<PullRequestRef[]>;
   getPullRequest(pullRequestId: number): Promise<PullRequestRef>;
   getFile(path: string, commitId: string): Promise<string>;
+  getFileUrl?(path: string, commitId: string): string;
 }

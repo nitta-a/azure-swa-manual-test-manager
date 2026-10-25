@@ -12,7 +12,7 @@ export function usePullRequest() {
     provider === "github"
       ? import.meta.env.VITE_GITHUB_REPOSITORY || "repository"
       : import.meta.env.VITE_REPOSITORY_ID || "repository";
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [selection, setSelection] = useState<{ key: string; ids: string[] }>({ key: "", ids: [] });
   const [details, setDetails] = useState({
     releaseName: "",
     environmentUrl: "",
@@ -30,7 +30,16 @@ export function usePullRequest() {
     queryKey: ["definition", provider, pullRequestId],
     queryFn: () => api.getDefinition(pullRequestId, provider),
     enabled: Boolean(pullRequestId),
+    staleTime: Infinity,
   });
+  const selectionKey = `${provider}:${pullRequestId}:${definition.data?.pullRequest.sourceCommitId}`;
+  const selectedItemIds = selection.key === selectionKey ? selection.ids : [];
+  function setSelectedItemIds(update: (ids: string[]) => string[]) {
+    setSelection((current) => ({
+      key: selectionKey,
+      ids: update(current.key === selectionKey ? current.ids : []),
+    }));
+  }
   const selected = useMemo(() => {
     const ids = new Set(selectedItemIds);
     return (
@@ -46,6 +55,7 @@ export function usePullRequest() {
         selected,
         selectedItemIds,
         Object.fromEntries(Object.entries(details).filter(([, value]) => value.trim())) as Partial<RunDetails>,
+        definition.data?.pullRequest.sourceCommitId,
       ),
     onSuccess: (run) => navigate(`/test-runs/${run.value.id}`),
   });

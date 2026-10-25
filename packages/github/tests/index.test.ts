@@ -55,3 +55,15 @@ test.each([401, 403])("surfaces GitHub auth error %s", async (status) => {
   );
   await expect(client.getPullRequest(1)).rejects.toThrow(`(${status})`);
 });
+
+test("source links use the web origin and an immutable commit, even with the explicit default API URL", () => {
+  const client = createGitHubClient({
+    owner: "owner",
+    repository: "repo",
+    token: "test",
+    apiUrl: "https://api.github.com",
+  });
+  expect(client.getFileUrl?.("checks/ReleaseCheck.md", "selected-sha")).toBe(
+    "https://github.com/owner/repo/blob/selected-sha/checks/ReleaseCheck.md",
+  );
+});

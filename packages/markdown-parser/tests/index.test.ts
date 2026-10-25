@@ -35,3 +35,26 @@ test("rejects malformed or empty checkbox items", () => {
   expect(() => parseTestMarkdown("- [x]")).toThrowError(MarkdownParseError);
   expect(() => parseTestMarkdown("- [/] bad")).toThrowError(MarkdownParseError);
 });
+
+test("accepts ReleaseCheck links with descriptions and ignores fenced example checkboxes", () => {
+  expect(
+    parseTestMarkdown(
+      [
+        "## ReleaseCheck",
+        "### テスト実行環境",
+        '- [手順](../setup.md#環境 "setup") を参照してください',
+        "- [ ] Chromeで確認",
+        "```markdown",
+        "- [ ] example only",
+        "```",
+        "### デッキ",
+        "- [ ] デッキを開く",
+      ].join("\n"),
+    ),
+  ).toEqual({
+    items: [
+      { hierarchy: ["ReleaseCheck", "テスト実行環境"], text: "Chromeで確認" },
+      { hierarchy: ["ReleaseCheck", "デッキ"], text: "デッキを開く" },
+    ],
+  });
+});

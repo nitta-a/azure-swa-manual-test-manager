@@ -20,6 +20,7 @@ export interface ResolvedTestDefinition {
     order: number;
     sourcePath?: string;
     sourceContent?: string;
+    sourceUrl?: string;
     items: Array<{
       id: string;
       hierarchy: string[];
@@ -37,10 +38,12 @@ async function resolveRepository(
   repositoryId: string,
   pullRequestId: number,
   suiteIds: string[],
+  expectedVersion?: string,
 ): Promise<ResolvedTestDefinition> {
   const client = context.providers[type];
   if (!client) throw new ServiceError(503, `${type} is not configured`);
   const pullRequest = await client.getPullRequest(pullRequestId);
+  checkVersion(expectedVersion, pullRequest.sourceCommitId);
   const manifest = parseManifest(await client.getFile(context.manifestPath, pullRequest.sourceCommitId));
   const selected = manifest.suites.filter((suite) => suiteIds.includes(suite.id));
   if (selected.length !== suiteIds.length) throw new ServiceError(400, "one or more suite ids are not in the manifest");
@@ -54,6 +57,7 @@ async function resolveRepository(
         order: manifest.suites.findIndex((entry) => entry.id === suite.id),
         sourcePath: suite.path,
         sourceContent,
+        ...(client.getFileUrl ? { sourceUrl: client.getFileUrl(suite.path, pullRequest.sourceCommitId) } : {}),
         items: parsed.items.map((item, order) => ({
           ...item,
           id: testItemSelectionId(suite.id, String(order)),
@@ -70,11 +74,13 @@ async function resolveAppManaged(
   context: ServiceContext,
   definitionId: string,
   suiteIds: string[],
+  expectedVersion?: string,
 ): Promise<ResolvedTestDefinition> {
   const definition = await context.repositories.definitions.get(context.projectId, definitionId);
   if (!definition || definition.value.archived) throw new ServiceError(404, "test definition not found");
   const revision = await context.repositories.definitionRevisions.get(definitionId, definition.value.currentRevisionId);
   if (!revision) throw new ServiceError(404, "test definition revision not found");
+  checkVersion(expectedVersion, revision.value.id);
   const suites = await context.repositories.definitionSuites.listByRevision(revision.value.id);
   const items = await context.repositories.definitionItems.listByRevision(revision.value.id);
   const selected = suites.filter((suite) => suiteIds.includes(suite.value.id));
@@ -104,11 +110,12 @@ export function resolveTestDefinition(
   source: DefinitionSource,
   suiteIds: string[],
   itemIds?: string[],
+  expectedVersion?: string,
 ): Promise<ResolvedTestDefinition> {
   const resolved =
     source.type === "appManaged"
-      ? resolveAppManaged(context, source.definitionId, suiteIds)
-      : resolveRepository(context, source.type, source.repositoryId, source.pullRequestId, suiteIds);
+      ? resolveAppManaged(context, source.definitionId, suiteIds, expectedVersion)
+      : resolveRepository(context, source.type, source.repositoryId, source.pullRequestId, suiteIds, expectedVersion);
   if (!itemIds) return resolved;
   return resolved.then((definition) => {
     const available = new Set(definition.suites.flatMap((suite) => suite.items.map((item) => item.id)));
@@ -124,6 +131,11 @@ export function resolveTestDefinition(
       })),
     };
   });
+}
+
+function checkVersion(expected: string | undefined, actual: string) {
+  if (expected && expected !== actual)
+    throw new ServiceError(409, "test definition changed; reload and select the test items again");
 }
 
 export async function getRepositoryDefinition(
@@ -142,6 +154,7 @@ export async function getRepositoryDefinition(
       return {
         ...suite,
         sourceMarkdown,
+        ...(client.getFileUrl ? { sourceUrl: client.getFileUrl(suite.path, pullRequest.sourceCommitId) } : {}),
         order: manifest.suites.findIndex((entry) => entry.id === suite.id),
         items: parseTestMarkdown(sourceMarkdown).items.map((item, order) => ({
           ...item,

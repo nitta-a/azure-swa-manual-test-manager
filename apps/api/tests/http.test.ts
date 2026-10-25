@@ -1,5 +1,5 @@
 import type { HttpRequest, InvocationContext } from "@azure/functions";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { createTestExecution } from "../src/handlers/executions.js";
 import { createTestRun, getTestRun, listTestRuns } from "../src/handlers/test-runs.js";
 import { createHttpHandler, principalUserId } from "../src/http.js";
@@ -39,6 +39,7 @@ test("create-test-run maps the request body and authenticated user", async () =>
     request({
       headers: { "x-user-id": "alice" },
       body: {
+        expectedDefinitionVersion: "commit-12",
         repositoryId: "repo",
         pullRequestId: 12,
         suiteIds: ["smoke"],
@@ -53,6 +54,7 @@ test("create-test-run maps the request body and authenticated user", async () =>
 
   expect(response.status).toBe(200);
   expect(received).toEqual({
+    expectedDefinitionVersion: "commit-12",
     repositoryId: "repo",
     pullRequestId: 12,
     suiteIds: ["smoke"],
@@ -215,4 +217,40 @@ test("maps service and unexpected errors to HTTP responses", async () => {
 
   expect(unexpectedErrorResponse.status).toBe(500);
   expect((unexpectedErrorResponse.jsonBody as { error: string }).error).toBe("internal server error");
+});
+
+test("production requires a valid authenticated test-runner principal, including for reads", async () => {
+  vi.stubEnv("NODE_ENV", "production");
+  try {
+    const handler = createHttpHandler(async () => ({ ok: true }), Promise.resolve({} as TestRunService));
+    expect((await handler(request({ headers: { "x-user-id": "spoofed" } }), context())).status).toBe(401);
+    expect((await handler(request({ headers: { "x-ms-client-principal": "invalid" } }), context())).status).toBe(401);
+    const principal = (userRoles: string[]) =>
+      Buffer.from(JSON.stringify({ userId: "alice", userRoles })).toString("base64");
+    expect(
+      (await handler(request({ headers: { "x-ms-client-principal": principal(["authenticated"]) } }), context()))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await handler(
+          request({ headers: { "x-ms-client-principal": principal(["authenticated", "test-runner"]) } }),
+          context(),
+        )
+      ).status,
+    ).toBe(200);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+test("requires the selected definition version on public run creation", async () => {
+  const handler = createHttpHandler(createTestRun, Promise.resolve({} as TestRunService));
+  const response = await handler(
+    request({
+      body: { repositoryId: "repo", pullRequestId: 42, suiteIds: ["smoke"] },
+    }),
+    context(),
+  );
+  expect(response.status).toBe(400);
 });

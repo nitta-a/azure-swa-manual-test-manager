@@ -61,6 +61,14 @@ test("App Managed edits create revisions without changing an existing run snapsh
   const after = await service.listItems(run.value.id);
   expect(after.map((item) => item.value.text)).toEqual(["Sign in", "Sign out"]);
   expect((await service.getTestDefinitionById(created.value.id)).value.name).toBe("Smoke v2");
+  await expect(
+    service.start({
+      source: { type: "appManaged", definitionId: created.value.id },
+      expectedDefinitionVersion: definition.value.currentRevisionId,
+      suiteIds: ["login"],
+      startedBy: "alice",
+    }),
+  ).rejects.toMatchObject({ status: 409 });
 });
 
 test("imports repository definitions with provenance and keeps them independent", async () => {

@@ -107,6 +107,10 @@ function RunSection({ title, runs, action }: { title: string; runs: TestRunSumma
                 {run.result ? ` / ${run.result}` : ""}
               </span>
               <span className={`run-badge state-${run.state}`}>{run.state}</span>
+              <span>
+                {run.releaseName || "Release not specified"} · {run.environmentUrl || "Environment not specified"} ·{" "}
+                {run.browser || "Browser not specified"}
+              </span>
               {run.result && <span className={`run-badge result-${run.result}`}>{run.result}</span>}
               <span>
                 {run.totalCount - run.pendingCount} / {run.totalCount} completed · {run.pendingCount} pending

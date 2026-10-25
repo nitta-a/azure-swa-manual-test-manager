@@ -15,6 +15,45 @@ afterEach(() => {
 });
 
 describe("pull request feature", () => {
+  it("selects the deck chapter without selecting sibling ReleaseCheck chapters", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          pullRequest: { id: 42, title: "Release", sourceCommitId: "selected-sha" },
+          suites: [
+            {
+              id: "release",
+              title: "ReleaseCheck",
+              path: "ReleaseCheck.md",
+              sourceMarkdown: "",
+              items: [
+                { id: "release:0", hierarchy: ["ReleaseCheck", "テスト実行環境"], text: "Chrome" },
+                { id: "release:1", hierarchy: ["ReleaseCheck", "デッキ", "編集"], text: "Save deck" },
+                { id: "release:2", hierarchy: ["ReleaseCheck", "デッキ", "表示"], text: "Open deck" },
+                { id: "release:3", hierarchy: ["ReleaseCheck", "翻訳機能"], text: "Translate" },
+              ],
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce({
+        ...jsonResponse({ error: "test definition changed; reload and select the test items again" }),
+        ok: false,
+        status: 409,
+      });
+    renderApp("/pull-requests/42");
+    fireEvent.click(await screen.findByRole("checkbox", { name: "デッキ" }));
+    expect(screen.getByRole("checkbox", { name: /Chrome/ })).toHaveProperty("checked", false);
+    expect(screen.getByRole("checkbox", { name: /Translate/ })).toHaveProperty("checked", false);
+    fireEvent.click(screen.getByRole("button", { name: "テスト開始" }));
+    await screen.findByText(/test definition changed/);
+    const startRequest = fetchMock.mock.calls.find(([path]) => path === "/api/test-runs");
+    expect(JSON.parse(startRequest?.[1].body)).toMatchObject({
+      expectedDefinitionVersion: "selected-sha",
+      itemIds: ["release:1", "release:2"],
+    });
+  });
+
   it("starts a run with the selected suites", async () => {
     fetchMock
       .mockResolvedValueOnce(
@@ -64,5 +103,10 @@ describe("pull request feature", () => {
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/test-runs", expect.objectContaining({ method: "POST" })),
     );
+    const startRequest = fetchMock.mock.calls.find(([path]) => path === "/api/test-runs");
+    expect(JSON.parse(startRequest?.[1].body)).toMatchObject({
+      expectedDefinitionVersion: "commit-1",
+      itemIds: ["smoke:0"],
+    });
   });
 });

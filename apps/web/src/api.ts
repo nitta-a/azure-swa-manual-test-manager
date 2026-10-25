@@ -30,6 +30,7 @@ export interface Suite {
   title: string;
   path: string;
   sourceMarkdown: string;
+  sourceUrl?: string;
   items: Array<{ id: string; hierarchy: string[]; text: string; order: number }>;
 }
 export interface Definition {
@@ -86,6 +87,9 @@ export interface TestRunSummary {
   blockedCount: number;
   skippedCount: number;
   excludedCount?: number;
+  releaseName?: string;
+  environmentUrl?: string;
+  browser?: string;
 }
 export interface RunDetails {
   releaseName?: string;
@@ -121,7 +125,14 @@ export interface Run {
     featureConfiguration?: string;
   };
   suites: Array<{
-    value: { suiteId: string; title: string; sourceMarkdown?: string; sourcePath?: string; order?: number };
+    value: {
+      suiteId: string;
+      title: string;
+      sourceMarkdown?: string;
+      sourcePath?: string;
+      sourceUrl?: string;
+      order?: number;
+    };
   }>;
   items: Item[];
 }
@@ -159,13 +170,21 @@ export const api = {
     suiteIds: string[],
     itemIds?: string[],
     details: RunDetails = {},
+    expectedDefinitionVersion?: string,
   ) =>
     request<{ value: { id: string } }>("/test-runs", {
       method: "POST",
       body: JSON.stringify(
         typeof sourceOrPullRequestId === "number"
-          ? { repositoryId, pullRequestId: sourceOrPullRequestId, suiteIds, itemIds, ...details }
-          : { source: sourceOrPullRequestId, suiteIds, itemIds, ...details },
+          ? {
+              repositoryId,
+              pullRequestId: sourceOrPullRequestId,
+              suiteIds,
+              itemIds,
+              ...details,
+              expectedDefinitionVersion,
+            }
+          : { source: sourceOrPullRequestId, suiteIds, itemIds, ...details, expectedDefinitionVersion },
       ),
     }),
   getRun: (runId: string) => request<Run>(`/test-runs/${runId}`),

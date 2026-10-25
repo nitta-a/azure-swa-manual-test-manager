@@ -49,6 +49,11 @@ export function createGitHubClient(config: GitHubClientConfig, fetchImpl: typeof
   }
 
   return {
+    getFileUrl(path, commitId) {
+      const api = new URL(config.apiUrl || "https://api.github.com");
+      const origin = api.hostname === "api.github.com" ? "https://github.com" : api.origin;
+      return `${origin}/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repository)}/blob/${encodeURIComponent(commitId)}/${path.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}`;
+    },
     async listPullRequests() {
       const result = await request<PullRequestResponse[]>(`${base}/pulls?state=open&per_page=100`);
       if (!Array.isArray(result)) throw new Error("GitHub pull request response is malformed");

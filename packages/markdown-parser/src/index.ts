@@ -27,9 +27,17 @@ export function parseTestMarkdown(markdown: string): ParsedTestDefinition {
   const headings: HeadingEntry[] = [];
   const listHeadings: ListEntry[] = [];
   const items: ParsedTestItem[] = [];
+  let fence: { character: string; length: number } | undefined;
 
   for (const [index, line] of markdown.replace(/\r\n?/g, "\n").split("\n").entries()) {
     const lineNumber = index + 1;
+    const delimiter = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (delimiter) {
+      if (!fence) fence = { character: delimiter[0] || "`", length: delimiter.length };
+      else if (delimiter[0] === fence.character && delimiter.length >= fence.length) fence = undefined;
+      continue;
+    }
+    if (fence) continue;
     const heading = /^(#{2,6})\s+(.+?)\s*#*\s*$/.exec(line);
     if (heading) {
       const text = heading[2]?.trim();
@@ -45,7 +53,7 @@ export function parseTestMarkdown(markdown: string): ParsedTestDefinition {
     if (!bullet) continue;
     const indent = bullet[1]?.replace(/\t/g, "    ").length ?? 0;
     const body = bullet[2] ?? "";
-    if (/^\[[^\]]+\]\([^)]*\)$/.test(body.trim())) continue;
+    if (/^!?\[[^\]]+\](?:\(|\[)/.test(body.trim())) continue;
     const checkbox = /^\[([^\]]*)\]\s*(.*)$/.exec(body);
     if (checkbox) {
       const marker = checkbox[1] ?? "";
