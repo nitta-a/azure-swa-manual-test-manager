@@ -18,6 +18,10 @@ export interface ResolvedTestDefinition {
     id: string;
     title: string;
     order: number;
+    applicationId?: string;
+    applicationTitle?: string;
+    featureId?: string;
+    featureTitle?: string;
     sourcePath?: string;
     sourceContent?: string;
     sourceUrl?: string;
@@ -55,6 +59,10 @@ async function resolveRepository(
         id: suite.id,
         title: suite.title,
         order: manifest.suites.findIndex((entry) => entry.id === suite.id),
+        ...(suite.applicationId ? { applicationId: suite.applicationId } : {}),
+        ...(suite.applicationTitle ? { applicationTitle: suite.applicationTitle } : {}),
+        ...(suite.featureId ? { featureId: suite.featureId } : {}),
+        ...(suite.featureTitle ? { featureTitle: suite.featureTitle } : {}),
         sourcePath: suite.path,
         sourceContent,
         ...(client.getFileUrl ? { sourceUrl: client.getFileUrl(suite.path, pullRequest.sourceCommitId) } : {}),
@@ -92,6 +100,10 @@ async function resolveAppManaged(
       id: suite.value.id,
       title: suite.value.title,
       order: suite.value.order,
+      ...(suite.value.applicationId ? { applicationId: suite.value.applicationId } : {}),
+      ...(suite.value.applicationTitle ? { applicationTitle: suite.value.applicationTitle } : {}),
+      ...(suite.value.featureId ? { featureId: suite.value.featureId } : {}),
+      ...(suite.value.featureTitle ? { featureTitle: suite.value.featureTitle } : {}),
       items: items
         .filter((item) => item.value.suiteId === suite.value.id)
         .map((item) => ({

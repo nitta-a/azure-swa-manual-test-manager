@@ -1,17 +1,55 @@
 import { expect, test } from "vitest";
 import { ManifestValidationError, parseManifest } from "../dist/index.js";
 
-test("parses manifest v1", () => {
-  expect(parseManifest("version: 1\nsuites:\n  - id: todo\n    title: TODO\n    path: tests/todo.md\n")).toEqual({
-    version: 1,
-    suites: [{ id: "todo", title: "TODO", path: "tests/todo.md" }],
+test("flattens manifest v2 applications into stable, app-scoped features", () => {
+  expect(
+    parseManifest(`version: 2
+applications:
+  - id: maker
+    title: Maker
+    features:
+      - id: auth
+        title: Authentication
+        path: tests/maker/auth.md
+  - id: viewer
+    title: Viewer
+    features:
+      - id: auth
+        title: Authentication
+        path: tests/viewer/auth.md
+`),
+  ).toEqual({
+    version: 2,
+    suites: [
+      {
+        id: "maker:auth",
+        title: "Authentication",
+        path: "tests/maker/auth.md",
+        applicationId: "maker",
+        applicationTitle: "Maker",
+        featureId: "auth",
+        featureTitle: "Authentication",
+      },
+      {
+        id: "viewer:auth",
+        title: "Authentication",
+        path: "tests/viewer/auth.md",
+        applicationId: "viewer",
+        applicationTitle: "Viewer",
+        featureId: "auth",
+        featureTitle: "Authentication",
+      },
+    ],
   });
 });
 
 for (const [name, source] of [
-  ["duplicate ids", "version: 1\nsuites: [{id: a, title: A, path: a.md}, {id: a, title: B, path: b.md}]"],
-  ["unsupported version", "version: 2\nsuites: []"],
-  ["empty title", 'version: 1\nsuites:\n  - id: a\n    title: ""\n    path: a.md'],
+  [
+    "duplicate application ids",
+    "version: 2\napplications: [{id: a, title: A, features: []}, {id: a, title: B, features: []}]",
+  ],
+  ["unsupported version", "version: 1\nsuites: []"],
+  ["empty feature title", 'version: 2\napplications: [{id: a, title: A, features: [{id: f, title: "", path: a.md}]}]'],
 ]) {
   test(`rejects ${name}`, () => expect(() => parseManifest(source)).toThrowError(ManifestValidationError));
 }

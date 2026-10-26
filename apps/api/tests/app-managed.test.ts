@@ -83,7 +83,9 @@ test("imports repository definitions with provenance and keeps them independent"
       sourceCommitId: "sha-7",
     }),
     getFile: async (path) =>
-      path === "manifest.yml" ? "version: 1\nsuites:\n  - id: login\n    title: Login\n    path: login.md" : markdown,
+      path === "manifest.yml"
+        ? "version: 2\napplications:\n  - id: account\n    title: Account\n    features:\n      - id: login\n        title: Login\n        path: login.md"
+        : markdown,
   };
   const repositories = new InMemoryRepositories();
   const service = new TestRunService(repositories, provider, "manifest.yml", undefined, {
@@ -92,7 +94,7 @@ test("imports repository definitions with provenance and keeps them independent"
 
   const imported = await service.importTestDefinition(
     { type: "github", repositoryId: "owner/repo", pullRequestId: 7 },
-    ["login"],
+    ["account:login"],
     "Imported login",
     "alice",
   );
@@ -106,6 +108,12 @@ test("imports repository definitions with provenance and keeps them independent"
     commitId: "sha-7",
     importedBy: "alice",
   });
+  expect(definition.suites[0]?.value).toMatchObject({
+    applicationId: "account",
+    applicationTitle: "Account",
+    featureId: "login",
+    featureTitle: "Login",
+  });
   expect(definition.items[0]?.value.text).toBe("Sign in");
   markdown = "## Login\n- [ ] Changed later";
   expect((await service.getTestDefinitionById(imported.value.id)).items[0]?.value.text).toBe("Sign in");
@@ -113,7 +121,7 @@ test("imports repository definitions with provenance and keeps them independent"
   markdown = "## Login\n- [ ] Sign in";
   const azureImported = await service.importTestDefinition(
     { type: "azureRepos", repositoryId: "repo", pullRequestId: 7 },
-    ["login"],
+    ["account:login"],
     "Imported Azure login",
     "alice",
   );

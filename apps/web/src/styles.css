@@ -213,6 +213,103 @@ legend {
   border-top: 1px solid #edf0f5;
   padding: 10px 0 0 20px;
 }
+.test-item-picker {
+  margin: 16px 0;
+}
+.picker-summary,
+.picker-steps,
+.picker-actions,
+.picker-feature-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.picker-summary {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #dce3ef;
+  border-radius: 12px;
+}
+.picker-summary span,
+.application-card small,
+.picker-feature-heading > span {
+  color: #68758a;
+}
+.picker-steps {
+  margin: 12px 0;
+}
+.picker-step {
+  flex: 1 1 180px;
+}
+.application-cards,
+.picker-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.application-card,
+.picker-feature,
+.review-application {
+  min-width: 0;
+  padding: 14px;
+  background: white;
+  border: 1px solid #e4e9f1;
+  border-radius: 12px;
+}
+.application-card small {
+  margin-left: 28px;
+}
+.picker-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin: 14px 0;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #e4e9f1;
+  border-radius: 12px;
+}
+.picker-item-results {
+  max-height: 420px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.picker-item-results li {
+  padding: 8px 0;
+  border-top: 1px solid #edf0f5;
+}
+.picker-feature-heading .check {
+  flex: 1;
+}
+.picker-actions {
+  margin: 14px 0;
+}
+.review-groups {
+  display: grid;
+  gap: 12px;
+}
+.review-feature {
+  padding-top: 8px;
+  border-top: 1px solid #edf0f5;
+}
+.review-feature h5 {
+  display: inline-block;
+  margin: 8px 12px 8px 0;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(99, 118, 232, 0.5);
+  outline-offset: 2px;
+}
 .source-preview,
 .excluded-items,
 .run-details {
@@ -327,6 +424,14 @@ button.quiet:hover:not(:disabled) {
   .progress,
   .comment-editor {
     padding: 15px;
+  }
+  .picker-tools {
+    grid-template-columns: 1fr;
+  }
+  .picker-summary {
+    top: 0;
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 code {

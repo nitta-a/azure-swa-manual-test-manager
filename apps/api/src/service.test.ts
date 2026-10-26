@@ -23,7 +23,7 @@ const devOps: AzureDevOpsClient = {
   },
   async getFile(path) {
     return path.includes("manifest")
-      ? "version: 1\nsuites:\n  - id: todo\n    title: TODO\n    path: todo.md"
+      ? "version: 2\napplications:\n  - id: todo-app\n    title: TODO App\n    features:\n      - id: todo\n        title: TODO\n        path: todo.md"
       : suiteMarkdown;
   },
 };
@@ -34,7 +34,7 @@ test("starts from a commit snapshot and records execution history", async () => 
   const created = await service.start({
     repositoryId: "repo",
     pullRequestId: 1,
-    suiteIds: ["todo"],
+    suiteIds: ["todo-app:todo"],
     startedBy: "user",
   });
   const items = await service.listItems(created.value.id);

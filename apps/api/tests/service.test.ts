@@ -11,14 +11,17 @@ const pullRequest: PullRequest = {
   sourceCommitId: "commit-42",
 };
 
-const manifest = `version: 1
-suites:
-  - id: smoke
-    title: Smoke tests
-    path: tests/smoke.md
-  - id: regression
-    title: Regression tests
-    path: tests/regression.md
+const manifest = `version: 2
+applications:
+  - id: checkout
+    title: Checkout
+    features:
+      - id: smoke
+        title: Smoke tests
+        path: tests/smoke.md
+      - id: regression
+        title: Regression tests
+        path: tests/regression.md
 `;
 
 function fixture() {
@@ -57,7 +60,7 @@ function fixture() {
   };
 }
 
-async function startRun(service: TestRunService, suiteIds: string[] = ["smoke"]) {
+async function startRun(service: TestRunService, suiteIds: string[] = ["checkout:smoke"]) {
   return service.start({
     repositoryId: "repo-1",
     pullRequestId: pullRequest.id,
@@ -74,7 +77,13 @@ test("lists pull requests and reads a definition at the PR source commit", async
   const definition = await service.getTestDefinition(pullRequest.id);
 
   expect(definition.pullRequest).toEqual(pullRequest);
-  expect(definition.manifest.suites.map((suite) => suite.id)).toEqual(["smoke", "regression"]);
+  expect(definition.manifest.suites.map((suite) => suite.id)).toEqual(["checkout:smoke", "checkout:regression"]);
+  expect(definition.manifest.suites[0]).toMatchObject({
+    applicationId: "checkout",
+    applicationTitle: "Checkout",
+    featureId: "smoke",
+    featureTitle: "Smoke tests",
+  });
   expect(fileRequests).toContainEqual({
     path: "manifest.yml",
     commitId: "commit-42",
@@ -97,7 +106,7 @@ test("rejects empty and unknown suite selections", async () => {
 test("creates a run with suite, item, and source snapshots", async () => {
   const { fileRequests, repositories, service } = fixture();
 
-  const created = await startRun(service, ["smoke", "regression"]);
+  const created = await startRun(service, ["checkout:smoke", "checkout:regression"]);
   const suites = await repositories.suites.listByRun(created.value.id);
   const items = await service.listItems(created.value.id);
 
@@ -112,6 +121,12 @@ test("creates a run with suite, item, and source snapshots", async () => {
   });
   expect(suites).toHaveLength(2);
   expect(suites.map((suite) => suite.value.order)).toEqual([0, 1]);
+  expect(suites[0]?.value).toMatchObject({
+    applicationId: "checkout",
+    applicationTitle: "Checkout",
+    featureId: "smoke",
+    featureTitle: "Smoke tests",
+  });
   expect(suites[0]?.value.sourceMarkdown).toContain("sign in");
   expect(items).toHaveLength(3);
   expect(items.map((item) => item.value.order)).toEqual([0, 1, 0]);
@@ -132,8 +147,8 @@ test("stores selected items, excluded items, and release/environment metadata on
   const created = await service.start({
     repositoryId: "repo-1",
     pullRequestId: pullRequest.id,
-    suiteIds: ["smoke"],
-    itemIds: ["smoke:1"],
+    suiteIds: ["checkout:smoke"],
+    itemIds: ["checkout%3Asmoke:1"],
     startedBy: "alice",
     releaseName: "release-2026.1",
     environmentUrl: "https://example.test",
@@ -349,8 +364,8 @@ test("rejects a changed selection version before publishing a run", async () => 
     await expect(
       service.start({
         source: { type, repositoryId: "repo-1", pullRequestId: 42 },
-        suiteIds: ["smoke"],
-        itemIds: ["smoke:0"],
+        suiteIds: ["checkout:smoke"],
+        itemIds: ["checkout%3Asmoke:0"],
         expectedDefinitionVersion: selected.pullRequest.sourceCommitId,
         startedBy: "alice",
       }),

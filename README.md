@@ -11,7 +11,7 @@ We compared three candidates—`manual-test-manager`, `test-runner-hub`, and `re
 - `apps/web`: React, Vite, TypeScript, React Router, and TanStack Query
 - `apps/api`: HTTP API for Azure Functions v4 / Static Web Apps Managed Functions
 - `packages/domain`: Framework-independent types and result evaluation
-- `packages/manifest`: YAML loading and validation for manifest v1
+- `packages/manifest`: YAML loading and validation for manifest v2
 - `packages/markdown-parser`: Markdown parser for heading and nested-list formats
 - `packages/source-control`: Provider-neutral pull request and file access contract
 - `packages/azure-devops`: Config-injected Azure DevOps adapter
@@ -66,20 +66,20 @@ For GitHub, use a fine-grained token with read-only `Contents` and `Pull request
 
 Use separate Static Web Apps and Application Settings for production and preview. Do not commit local secrets.
 
-### manifest v1
+### manifest v2
 
 ```yaml
-version: 1
-suites:
-  - id: todo
-    title: TODO
-    path: tests/manual/todo.md
-  - id: auth
-    title: 認証
-    path: tests/manual/auth.md
+version: 2
+applications:
+  - id: maker
+    title: Maker
+    features:
+      - id: auth
+        title: 認証
+        path: tests/manual/maker/auth.md
 ```
 
-Once created, `id` is a stable identifier and should not be changed. `title` and `path` may be changed. Duplicate IDs, unsupported versions, empty values, and invalid YAML are rejected before a run starts.
+Application and feature IDs are stable identifiers. Feature IDs are scoped to their application, so the same feature ID may be reused by different applications. Duplicate IDs within the same scope, unsupported versions, empty values, and invalid YAML are rejected before a run starts. Manifest v1 is not supported.
 
 Markdown TestItems are checkbox list items only. Heading-formatted items (`## suite`, `### subgroup`) and existing nested lists are converted to the same `hierarchy` / `text` representation. Normal paragraphs, links, and blockquotes are not treated as items, and the original Markdown is saved as a snapshot when a run starts.
 
@@ -89,13 +89,13 @@ Use the Standard plan for SWA and tenant-specific Entra ID Custom Authentication
 
 ### MVP scope
 
-The implemented core flow is: list PRs → list suites for a PR → select suites → fix a commit snapshot → record PASS / FAIL / BLOCKED / SKIPPED → view execution history. TestRunItem updates detect conflicts with `If-Match` and the Azure Table ETag.
+The implemented core flow is: list PRs → select applications, features and individual items using the shared searchable picker → review the selection → fix a commit snapshot → record PASS / FAIL / BLOCKED / SKIPPED → view execution history. Search results are capped to 100 rendered rows while bulk actions apply to every match. Selection is retained across filters, and TestRunItem updates detect conflicts with `If-Match` and the Azure Table ETag.
 
 Existing runs do not change when a PR's HEAD is updated. A new run can be created for the same commit. Completed runs are read-only; reopening a run returns it to `inProgress` while preserving its snapshot, and never uses a newer PR HEAD.
 
 Run creation requires `expectedDefinitionVersion` (the selected PR commit or App Managed revision). A changed version returns 409 and requires reloading/reselecting, rather than applying positional item IDs to different instructions. Completion reviews release/environment/browser and application-version records; irrelevant version fields may remain blank. The list identifies release/environment/browser, and the PR report includes application versions and execution conditions.
 
-Test definitions have three sources: Azure Repos, GitHub, and App Managed. Repository runs snapshot the selected PR HEAD commit. App Managed stores structured suites/items in immutable revisions; changing the current definition never changes existing runs. Import copies a repository revision into App Managed and records provenance without synchronization.
+Test definitions have three sources: Azure Repos, GitHub, and App Managed. Repository runs snapshot the selected PR HEAD commit. App Managed stores structured suites/items in immutable revisions; optional application metadata groups suites into applications and features. Changing the current definition never changes existing runs. Import copies a repository revision into App Managed and records provenance without synchronization. Run suite snapshots preserve the selected classification.
 
 Out of scope for the MVP: suite recommendations from changed files, permanent TestCase IDs, long-term analytics, assignees, attachments, AI, PR status / branch policies, Teams notifications, repository write-back, webhooks, bidirectional sync, OAuth login, and rich-text editing.
 
@@ -110,7 +110,7 @@ Azure Repos、GitHub、App Managed の test definition を正本にして、手�
 - `apps/web`: React + Vite + TypeScript、React Router、TanStack Query
 - `apps/api`: Azure Functions v4 / Static Web Apps Managed Functions 用 HTTP API
 - `packages/domain`: 外部フレームワークに依存しない型と結果判定
-- `packages/manifest`: manifest v1 の YAML 読み込み・検証
+- `packages/manifest`: manifest v2 の YAML 読み込み・検証
 - `packages/markdown-parser`: Heading / 既存ネスト形式の Markdown parser
 - `packages/source-control`: provider-neutral な PR / file access contract
 - `packages/azure-devops`: 設定注入型の Azure DevOps adapter
@@ -165,20 +165,20 @@ GitHub は対象 repository に対する fine-grained token の read-only `Conte
 
 Production と preview は別の Static Web Apps / Application Settings とし、local の秘密はコミットしません。
 
-### manifest v1
+### manifest v2
 
 ```yaml
-version: 1
-suites:
-  - id: todo
-    title: TODO
-    path: tests/manual/todo.md
-  - id: auth
-    title: 認証
-    path: tests/manual/auth.md
+version: 2
+applications:
+  - id: maker
+    title: Maker
+    features:
+      - id: auth
+        title: 認証
+        path: tests/manual/maker/auth.md
 ```
 
-`id` は一度作成したら変えない安定 ID です。`title` と `path` は変更できます。重複 ID、未対応 version、空値、壊れた YAML は開始前に拒否します。
+アプリ ID と機能 ID は安定 ID です。機能 ID はアプリ内で一意であればよく、別アプリで同じ ID を再利用できます。スコープ内の重複 ID、未対応 version、空値、壊れた YAML は開始前に拒否します。Manifest v1 はサポートしません。
 
 Markdown の TestItem は checkbox list だけです。Heading 形式（`## suite`、`### subgroup`）と既存のネスト list を同じ `hierarchy` / `text` に変換します。通常段落、リンク、blockquote は項目にせず、実行開始時に元 Markdown を snapshot として保存します。
 
@@ -188,12 +188,14 @@ SWA は Standard plan とし、Entra ID Custom Authentication を対象テナン
 
 ### MVP の境界
 
-実装済みの中心フローは、PR 一覧 → PR の suite 一覧 → suite 選択 → commit snapshot 固定 → PASS / FAIL / BLOCKED / SKIPPED → execution 履歴閲覧です。TestRunItem の更新は `If-Match` と Azure Table の ETag で競合を検知します。
+実装済みの中心フローは、PR 一覧 → 共通の検索可能な選択 UI でアプリ・機能・個別項目を選択 → 内容確認 → commit snapshot 固定 → PASS / FAIL / BLOCKED / SKIPPED → execution 履歴閲覧です。検索結果は画面に最大 100 行だけ描画し、一括操作は該当する全件に適用します。絞り込み後も選択状態を保持し、TestRunItem の更新は `If-Match` と Azure Table の ETag で競合を検知します。
 
 PR の HEAD 更新後も既存 Run は変化しません。同じ commit でも新しい Run を作成できます。完了後は read-only、reopen は snapshot を維持したまま inProgress に戻し、PR の HEAD 更新には使いません。
 
 Run 開始 API は選択時の PR commit または App Managed revision を `expectedDefinitionVersion` として必須にします。変更時は 409 とし、再読込・再選択を求めます。完了前にリリース・環境・ブラウザ・対象アプリ版の記録を確認でき、不要な版は空欄のまま完了できます。一覧はリリース・環境・ブラウザを表示し、PR 用概要は対象アプリ版・実施条件も含めます。
 
-Test definition の source は Azure Repos、GitHub、App Managed の3種類です。Repository run は PR HEAD commit を snapshot します。App Managed は structured suites/items と immutable revision を保存し、Import は provenance を残しますが同期は行いません。
+Test definition の source は Azure Repos、GitHub、App Managed の3種類です。Repository run は PR HEAD commit を snapshot します。App Managed は structured suites/items と immutable revision を保存し、suite に任意のアプリ分類を設定できます。Import は provenance を残しますが同期は行いません。Run の suite snapshot にも分類を保存します。
+
+テスト選択では分類がない項目を「未分類のアプリ」にまとめ、名称やファイルパスからアプリを推測しません。PR 変更ファイルと定義の対応付けは将来、Manifest v2 のアプリ・機能 ID と path を拡張点として追加できます。推薦は今回の範囲外であり、候補にない項目も手動で検索・選択します。
 
 MVP 外: 変更ファイルからの suite 推薦、恒久的 TestCase ID、長期分析、担当者割当、添付、AI、PR status / branch policy、Teams 通知、repository write-back、webhook、双方向同期、OAuth login、rich-text 編集。

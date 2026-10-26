@@ -1,12 +1,14 @@
-import { groupByChapter } from "../shared/chapters";
+import { useState } from "react";
 import { ErrorMessage } from "../shared/ErrorMessage";
 import { Page } from "../shared/Page";
 import { RunMetadataFields } from "../shared/RunMetadataFields";
+import { TestItemPicker } from "../shared/TestItemPicker";
 import { usePullRequest } from "./usePullRequest";
 
 export function PullRequestView() {
-  const { definition, selectedItemIds, startRun, toggleSuite, toggleItem, toggleItems, details, setDetail } =
-    usePullRequest();
+  const { definition, selectedItemIds, setSelectedItems, startRun, details, setDetail } = usePullRequest();
+  const [reviewedSignature, setReviewedSignature] = useState("");
+  const signature = JSON.stringify([definition.data?.pullRequest.sourceCommitId, [...selectedItemIds].sort()]);
   const title = definition.data
     ? `#${definition.data.pullRequest.id} ${definition.data.pullRequest.title}`
     : "プルリクエストの詳細";
@@ -14,7 +16,7 @@ export function PullRequestView() {
   return (
     <Page
       title={title}
-      description="テストするスイートや項目を選択し、必要な実行環境情報を入力してテストを開始します。チェックボックスはスイート・章単位でも切り替えられます。"
+      description="アプリ・機能から対象を絞り、テスト項目を検索・選択して内容を確認してから開始します。"
     >
       <ErrorMessage error={definition.error || startRun.error} />
       {definition.isPending ? (
@@ -25,63 +27,28 @@ export function PullRequestView() {
             <p>
               変更コミット: <code>{definition.data.pullRequest.sourceCommitId}</code>
             </p>
-            <fieldset>
-              <legend>実施するスイートを選択</legend>
-              {definition.data.suites.map((suite) => (
-                <div className="suite-selection" key={suite.id}>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={suite.items.length > 0 && suite.items.every((item) => selectedItemIds.includes(item.id))}
-                      onChange={(event) => toggleSuite(suite.id, event.target.checked)}
-                    />
-                    {suite.title}
-                    <small>{suite.path}</small>
-                  </label>
-                  <details className="source-preview">
-                    <summary>元のテスト定義（Markdown）を確認</summary>
-                    <pre>{suite.sourceMarkdown}</pre>
-                  </details>
-                  {groupByChapter(suite.items, (item) => item.hierarchy).map((group) => (
-                    <div className="chapter" key={group.items[0]?.id || group.title}>
-                      {group.title && (
-                        <label className="check">
-                          <input
-                            type="checkbox"
-                            checked={group.items.every((item) => selectedItemIds.includes(item.id))}
-                            onChange={(event) =>
-                              toggleItems(
-                                group.items.map((item) => item.id),
-                                event.target.checked,
-                              )
-                            }
-                          />
-                          {group.title}
-                        </label>
-                      )}
-                      {group.items.map((item) => (
-                        <label className="check" key={item.id}>
-                          <input
-                            type="checkbox"
-                            checked={selectedItemIds.includes(item.id)}
-                            onChange={(event) => toggleItem(item.id, event.target.checked)}
-                          />
-                          {item.hierarchy.length > 1 ? `${item.hierarchy.slice(1).join(" / ")} / ` : ""}
-                          {item.text}
-                        </label>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </fieldset>
+            <TestItemPicker
+              features={definition.data.suites.map((suite) => ({
+                ...suite,
+                title: suite.featureTitle || suite.title,
+                items: suite.items,
+              }))}
+              selectedItemIds={selectedItemIds}
+              onChange={(ids) => {
+                setSelectedItems(ids);
+                setReviewedSignature("");
+              }}
+              onReview={(ids) =>
+                setReviewedSignature(JSON.stringify([definition.data?.pullRequest.sourceCommitId, [...ids].sort()]))
+              }
+            />
             <RunMetadataFields details={details} onChange={setDetail} />
             <button
               type="button"
-              disabled={selectedItemIds.length === 0 || startRun.isPending}
+              disabled={selectedItemIds.length === 0 || reviewedSignature !== signature || startRun.isPending}
               onClick={() => startRun.mutate()}
             >
-              選択した項目でテストを開始
+              選択した {selectedItemIds.length} 項目でテストを開始
             </button>
           </>
         )
