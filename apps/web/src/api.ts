@@ -29,6 +29,10 @@ export interface Suite {
   id: string;
   title: string;
   path: string;
+  applicationId?: string | undefined;
+  applicationTitle?: string | undefined;
+  featureId?: string | undefined;
+  featureTitle?: string | undefined;
   sourceMarkdown: string;
   sourceUrl?: string;
   items: Array<{ id: string; hierarchy: string[]; text: string; order: number }>;
@@ -41,7 +45,18 @@ export interface ManagedDefinition {
   value: { id: string; name: string; currentRevisionId: string };
   etag: string;
   revision?: { value: { id: string } };
-  suites: Array<{ value: { id: string; title: string; order: number }; etag: string }>;
+  suites: Array<{
+    value: {
+      id: string;
+      title: string;
+      order: number;
+      applicationId?: string | undefined;
+      applicationTitle?: string | undefined;
+      featureId?: string | undefined;
+      featureTitle?: string | undefined;
+    };
+    etag: string;
+  }>;
   items: Array<{
     value: { id: string; suiteId: string; hierarchy: string[]; text: string; order: number };
     etag: string;
@@ -128,6 +143,10 @@ export interface Run {
     value: {
       suiteId: string;
       title: string;
+      applicationId?: string | undefined;
+      applicationTitle?: string | undefined;
+      featureId?: string | undefined;
+      featureTitle?: string | undefined;
       sourceMarkdown?: string;
       sourcePath?: string;
       sourceUrl?: string;
@@ -220,7 +239,17 @@ export const api = {
   getTestDefinitionById: (id: string) => request<ManagedDefinition>(`/test-definitions/${id}`),
   createTestDefinition: (
     name: string,
-    content: { suites: Array<{ id: string; title: string; items: Array<{ hierarchy: string[]; text: string }> }> },
+    content: {
+      suites: Array<{
+        id: string;
+        title: string;
+        applicationId?: string | undefined;
+        applicationTitle?: string | undefined;
+        featureId?: string | undefined;
+        featureTitle?: string | undefined;
+        items: Array<{ hierarchy: string[]; text: string }>;
+      }>;
+    },
   ) =>
     request<{ value: ManagedDefinition["value"]; etag: string }>("/test-definitions", {
       method: "POST",
@@ -230,7 +259,17 @@ export const api = {
     id: string,
     etag: string,
     name: string,
-    content: { suites: Array<{ id: string; title: string; items: Array<{ hierarchy: string[]; text: string }> }> },
+    content: {
+      suites: Array<{
+        id: string;
+        title: string;
+        applicationId?: string | undefined;
+        applicationTitle?: string | undefined;
+        featureId?: string | undefined;
+        featureTitle?: string | undefined;
+        items: Array<{ hierarchy: string[]; text: string }>;
+      }>;
+    },
   ) =>
     request<{ value: ManagedDefinition["value"]; etag: string }>(`/test-definitions/${id}`, {
       method: "PUT",

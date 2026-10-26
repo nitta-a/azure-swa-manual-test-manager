@@ -2,18 +2,27 @@ import { testItemSelectionId } from "@manual-test-manager/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, type ManagedDefinition, type RunDetails } from "../../api";
-import { groupByChapter } from "../shared/chapters";
 import { ErrorMessage } from "../shared/ErrorMessage";
 import { Page } from "../shared/Page";
 import { RunMetadataFields } from "../shared/RunMetadataFields";
+import { TestItemPicker } from "../shared/TestItemPicker";
 
-type DraftSuite = { id: string; title: string; items: Array<{ id?: string; hierarchy: string[]; text: string }> };
+type DraftSuite = {
+  id: string;
+  title: string;
+  applicationId?: string | undefined;
+  applicationTitle?: string | undefined;
+  featureId?: string | undefined;
+  featureTitle?: string | undefined;
+  items: Array<{ id?: string; hierarchy: string[]; text: string }>;
+};
 
 export function DefinitionsView() {
   const client = useQueryClient();
   const definitions = useQuery({ queryKey: ["test-definitions"], queryFn: api.listTestDefinitions });
   const [selectedId, setSelectedId] = useState<string>();
   const [runItemIds, setRunItemIds] = useState<string[]>([]);
+  const [reviewedSignature, setReviewedSignature] = useState("");
   const [runDetails, setRunDetails] = useState<RunDetails>({});
   const [name, setName] = useState("新しいテスト定義");
   const [draftSuites, setDraftSuites] = useState<DraftSuite[]>([
@@ -43,11 +52,15 @@ export function DefinitionsView() {
   });
   useEffect(() => {
     if (!selected.data) return;
-    setRunItemIds(selected.data.items.map((item) => testItemSelectionId(item.value.suiteId, item.value.id)));
+    setRunItemIds([]);
     setDraftSuites(
       selected.data.suites.map((suite) => ({
         id: suite.value.id,
         title: suite.value.title,
+        applicationId: suite.value.applicationId,
+        applicationTitle: suite.value.applicationTitle,
+        featureId: suite.value.featureId,
+        featureTitle: suite.value.featureTitle,
         items: selected.data.items
           .filter((item) => item.value.suiteId === suite.value.id)
           .map((item) => ({
@@ -103,6 +116,7 @@ export function DefinitionsView() {
     mutationFn: () => api.importTestDefinition(provider, repositoryId, Number(pullRequestId), suiteIds, name),
     onSuccess: () => client.invalidateQueries({ queryKey: ["test-definitions"] }),
   });
+  const runSelectionSignature = JSON.stringify([selected.data?.value.currentRevisionId, [...runItemIds].sort()]);
 
   return (
     <Page
@@ -230,6 +244,36 @@ export function DefinitionsView() {
                   setDraftSuites((current) =>
                     current.map((entry, index) =>
                       index === suiteIndex ? { ...entry, title: event.target.value } : entry,
+                    ),
+                  )
+                }
+              />
+              <input
+                aria-label={`スイート${suiteIndex + 1}のアプリ名`}
+                placeholder="アプリ名（未分類の場合は空欄）"
+                value={suite.applicationTitle || ""}
+                onChange={(event) =>
+                  setDraftSuites((current) =>
+                    current.map((entry, index) =>
+                      index === suiteIndex
+                        ? {
+                            ...entry,
+                            applicationTitle: event.target.value,
+                            applicationId: event.target.value ? entry.applicationId || event.target.value : undefined,
+                          }
+                        : entry,
+                    ),
+                  )
+                }
+              />
+              <input
+                aria-label={`スイート${suiteIndex + 1}のアプリID`}
+                placeholder="安定したアプリID"
+                value={suite.applicationId || ""}
+                onChange={(event) =>
+                  setDraftSuites((current) =>
+                    current.map((entry, index) =>
+                      index === suiteIndex ? { ...entry, applicationId: event.target.value || undefined } : entry,
                     ),
                   )
                 }
@@ -368,77 +412,29 @@ export function DefinitionsView() {
           <button type="button" onClick={() => update.mutate(selected.data)} disabled={update.isPending}>
             変更を保存
           </button>
-          <fieldset>
-            <legend>実施する項目を選択</legend>
-            {selected.data.suites.map((suite) => {
-              const suiteItems = selected.data.items.filter((item) => item.value.suiteId === suite.value.id);
-              return (
-                <div className="suite-selection" key={suite.value.id}>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={
-                        suiteItems.length > 0 &&
-                        suiteItems.every((item) =>
-                          runItemIds.includes(testItemSelectionId(suite.value.id, item.value.id)),
-                        )
-                      }
-                      onChange={(event) => {
-                        const itemIds = suiteItems.map((item) => testItemSelectionId(suite.value.id, item.value.id));
-                        setRunItemIds((current) =>
-                          event.target.checked
-                            ? [...new Set([...current, ...itemIds])]
-                            : current.filter((id) => !itemIds.includes(id)),
-                        );
-                      }}
-                    />
-                    {suite.value.title}
-                  </label>
-                  {groupByChapter(suiteItems, (item) => item.value.hierarchy).map((group) => (
-                    <div className="chapter" key={group.items[0]?.value.id || group.title}>
-                      {group.title && (
-                        <label className="check">
-                          <input
-                            type="checkbox"
-                            checked={group.items.every((item) =>
-                              runItemIds.includes(testItemSelectionId(suite.value.id, item.value.id)),
-                            )}
-                            onChange={(event) => {
-                              const itemIds = group.items.map((item) =>
-                                testItemSelectionId(suite.value.id, item.value.id),
-                              );
-                              setRunItemIds((current) =>
-                                event.target.checked
-                                  ? [...new Set([...current, ...itemIds])]
-                                  : current.filter((id) => !itemIds.includes(id)),
-                              );
-                            }}
-                          />
-                          {group.title}
-                        </label>
-                      )}
-                      {group.items.map((item) => (
-                        <label className="check" key={item.value.id}>
-                          <input
-                            type="checkbox"
-                            checked={runItemIds.includes(testItemSelectionId(suite.value.id, item.value.id))}
-                            onChange={(event) =>
-                              setRunItemIds((current) =>
-                                event.target.checked
-                                  ? [...new Set([...current, testItemSelectionId(suite.value.id, item.value.id)])]
-                                  : current.filter((id) => id !== testItemSelectionId(suite.value.id, item.value.id)),
-                              )
-                            }
-                          />
-                          {item.value.hierarchy.slice(1).join(" / ")} {item.value.text}
-                        </label>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </fieldset>
+          <TestItemPicker
+            features={selected.data.suites.map((suite) => ({
+              id: suite.value.id,
+              title: suite.value.featureTitle || suite.value.title,
+              applicationId: suite.value.applicationId,
+              applicationTitle: suite.value.applicationTitle,
+              items: selected.data.items
+                .filter((item) => item.value.suiteId === suite.value.id)
+                .map((item) => ({
+                  id: testItemSelectionId(suite.value.id, item.value.id),
+                  hierarchy: item.value.hierarchy,
+                  text: item.value.text,
+                })),
+            }))}
+            selectedItemIds={runItemIds}
+            onChange={(ids) => {
+              setRunItemIds(ids);
+              setReviewedSignature("");
+            }}
+            onReview={(ids) =>
+              setReviewedSignature(JSON.stringify([selected.data?.value.currentRevisionId, [...ids].sort()]))
+            }
+          />
           <RunMetadataFields
             details={runDetails}
             onChange={(key, value) => setRunDetails((current) => ({ ...current, [key]: value }))}
@@ -446,9 +442,9 @@ export function DefinitionsView() {
           <button
             type="button"
             onClick={() => start.mutate(selected.data)}
-            disabled={start.isPending || runItemIds.length === 0}
+            disabled={start.isPending || runItemIds.length === 0 || reviewedSignature !== runSelectionSignature}
           >
-            選択した項目でテストを開始
+            選択した {runItemIds.length} 項目でテストを開始
           </button>
         </section>
       )}

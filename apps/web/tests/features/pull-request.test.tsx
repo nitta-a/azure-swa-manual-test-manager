@@ -42,10 +42,13 @@ describe("pull request feature", () => {
         status: 409,
       });
     renderApp("/pull-requests/42");
-    fireEvent.click(await screen.findByRole("checkbox", { name: "デッキ" }));
+    fireEvent.click(await screen.findByRole("button", { name: /機能選択へ/ }));
+    fireEvent.click(screen.getByRole("button", { name: "個別項目を調整" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "デッキを選択" }));
     expect(screen.getByRole("checkbox", { name: /Chrome/ })).toHaveProperty("checked", false);
     expect(screen.getByRole("checkbox", { name: /Translate/ })).toHaveProperty("checked", false);
-    fireEvent.click(screen.getByRole("button", { name: "選択した項目でテストを開始" }));
+    fireEvent.click(screen.getAllByRole("button", { name: /選択内容を確認/ }).at(-1) as HTMLButtonElement);
+    fireEvent.click(screen.getByRole("button", { name: "選択した 2 項目でテストを開始" }));
     await screen.findByText(/test definition changed/);
     const startRequest = fetchMock.mock.calls.find(([path]) => path === "/api/test-runs");
     expect(JSON.parse(startRequest?.[1].body)).toMatchObject({
@@ -91,13 +94,18 @@ describe("pull request feature", () => {
 
     renderApp("/pull-requests/42");
 
-    const checkboxes = await screen.findAllByRole("checkbox");
-    const startButton = screen.getByRole("button", { name: "選択した項目でテストを開始" });
+    await screen.findByRole("button", { name: /機能選択へ/ });
+    const startButton = screen.getByRole("button", { name: "選択した 0 項目でテストを開始" });
     expect((startButton as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.click(checkboxes[0] as HTMLInputElement);
-    expect((startButton as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(startButton);
+    fireEvent.click(screen.getByRole("button", { name: /機能選択へ/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Smokeを選択" }));
+    const selectedStartButton = screen.getByRole("button", { name: "選択した 1 項目でテストを開始" });
+    expect((selectedStartButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getAllByRole("button", { name: /選択内容を確認/ }).at(-1) as HTMLButtonElement);
+    const reviewedStartButton = screen.getByRole("button", { name: "選択した 1 項目でテストを開始" });
+    expect((reviewedStartButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(reviewedStartButton);
 
     await screen.findByRole("heading", { name: "テスト実行の詳細" });
     await waitFor(() =>

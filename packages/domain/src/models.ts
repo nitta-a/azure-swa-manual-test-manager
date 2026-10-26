@@ -68,6 +68,10 @@ export interface TestRunSuite {
   suiteId: string;
   title: string;
   order?: number;
+  applicationId?: string;
+  applicationTitle?: string;
+  featureId?: string;
+  featureTitle?: string;
   filePath?: string;
   sourceMarkdown?: string;
   sourcePath?: string;
@@ -138,6 +142,10 @@ export interface TestDefinitionSuite {
   id: string;
   title: string;
   order: number;
+  applicationId?: string;
+  applicationTitle?: string;
+  featureId?: string;
+  featureTitle?: string;
 }
 
 export interface TestDefinitionItem {

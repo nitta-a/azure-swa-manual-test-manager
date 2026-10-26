@@ -60,30 +60,13 @@ export function usePullRequest() {
     onSuccess: (run) => navigate(`/test-runs/${run.value.id}`),
   });
 
-  function toggleSuite(suiteId: string, checked: boolean) {
-    const suite = definition.data?.suites.find((entry) => entry.id === suiteId);
-    if (!suite) return;
-    const itemIds = suite.items.map((item) => item.id);
-    setSelectedItemIds((current) =>
-      checked ? [...new Set([...current, ...itemIds])] : current.filter((itemId) => !itemIds.includes(itemId)),
-    );
-  }
-
-  function toggleItem(itemId: string, checked: boolean) {
-    setSelectedItemIds((current) =>
-      checked ? [...new Set([...current, itemId])] : current.filter((id) => id !== itemId),
-    );
-  }
-
-  function toggleItems(itemIds: string[], checked: boolean) {
-    setSelectedItemIds((current) =>
-      checked ? [...new Set([...current, ...itemIds])] : current.filter((id) => !itemIds.includes(id)),
-    );
+  function setSelectedItems(itemIds: string[]) {
+    setSelectedItemIds(() => itemIds);
   }
 
   function setDetail<K extends keyof typeof details>(key: K, value: string) {
     setDetails((current) => ({ ...current, [key]: value }));
   }
 
-  return { definition, selected, selectedItemIds, startRun, toggleSuite, toggleItem, toggleItems, details, setDetail };
+  return { definition, selected, selectedItemIds, startRun, setSelectedItems, details, setDetail };
 }

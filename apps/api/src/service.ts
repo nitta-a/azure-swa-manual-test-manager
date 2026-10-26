@@ -1,6 +1,6 @@
 import type { AzureDevOpsClient, PullRequest } from "@manual-test-manager/azure-devops";
 import type { TestExecution, TestRun, TestRunItem, TestRunSummary, TestStatus } from "@manual-test-manager/domain";
-import type { ManifestV1 } from "@manual-test-manager/manifest";
+import type { ParsedManifest } from "@manual-test-manager/manifest";
 import type { SourceControlClient } from "@manual-test-manager/source-control";
 import type { RepositorySet, TestRunSummaryQuery, Versioned } from "@manual-test-manager/storage";
 import type { ServiceContext } from "./service/context.js";
@@ -61,8 +61,8 @@ export interface ExecutionInput {
 
 export interface TestDefinition {
   pullRequest: PullRequest;
-  manifest: ManifestV1;
-  suites: ManifestV1["suites"];
+  manifest: ParsedManifest;
+  suites: ParsedManifest["suites"];
 }
 
 export class TestRunService {

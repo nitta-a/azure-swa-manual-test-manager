@@ -14,6 +14,10 @@ export interface DefinitionContent {
   suites: Array<{
     id: string;
     title: string;
+    applicationId?: string;
+    applicationTitle?: string;
+    featureId?: string;
+    featureTitle?: string;
     items: Array<{ id?: string | undefined; hierarchy: string[]; text: string; order?: number | undefined }>;
   }>;
 }
@@ -24,6 +28,10 @@ function contentRecords(revisionId: string, content: DefinitionContent) {
     id: suite.id,
     title: suite.title,
     order,
+    ...(suite.applicationId ? { applicationId: suite.applicationId } : {}),
+    ...(suite.applicationTitle ? { applicationTitle: suite.applicationTitle } : {}),
+    ...(suite.featureId ? { featureId: suite.featureId } : {}),
+    ...(suite.featureTitle ? { featureTitle: suite.featureTitle } : {}),
   }));
   const items: TestDefinitionItem[] = content.suites.flatMap((suite) =>
     suite.items.map((item, order) => ({
@@ -147,7 +155,15 @@ export async function importDefinition(
   const resolved = await resolveTestDefinition(context, source, suiteIds);
   if (resolved.source.type === "appManaged") throw new ServiceError(400, "import source must be a repository");
   const content: DefinitionContent = {
-    suites: resolved.suites.map((suite) => ({ id: suite.id, title: suite.title, items: suite.items })),
+    suites: resolved.suites.map((suite) => ({
+      id: suite.id,
+      title: suite.title,
+      ...(suite.applicationId ? { applicationId: suite.applicationId } : {}),
+      ...(suite.applicationTitle ? { applicationTitle: suite.applicationTitle } : {}),
+      ...(suite.featureId ? { featureId: suite.featureId } : {}),
+      ...(suite.featureTitle ? { featureTitle: suite.featureTitle } : {}),
+      items: suite.items,
+    })),
   };
   const importedFrom = {
     provider: source.type,
