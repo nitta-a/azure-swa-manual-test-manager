@@ -22,9 +22,9 @@
     "@manual-test-manager/markdown-parser": "workspace:*",
     "@manual-test-manager/storage": "workspace:*",
     "@manual-test-manager/source-control": "workspace:*",
-    "zod": "^4.6.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.5"
   }
 }
